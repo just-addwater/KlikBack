@@ -1,3 +1,6 @@
+
+<img width="836" height="464" alt="KBlogo" src="https://github.com/user-attachments/assets/66062c45-83cf-421b-bbc8-de65c25a6b37" />
+
 # KlikBack: a decompiler for MMF,TGF,CnC Clickteam games
 
 **Turn a compiled Multimedia Fusion 1.0/1.5, The Games Factory, MultiMedia Fusion Express or Click & Create
@@ -24,16 +27,16 @@ command line, and the packaged app is a plain folder with no installer.
 
 |  | Input | Versions | What you get |
 |:--:|---|---|---|
-| ✅ | Multimedia Fusion **1.0 / 1.1 / 1.2** standalone (`.exe`) | builds 87 to 98 | an editable `.cca`, plus an inventory of what was recovered |
-| ✅ | Multimedia Fusion **1.5** standalone (`.exe`) or package (`.ccn`) | builds 105 to 119 | an editable `.cca`, written as build 119 |
+| ✅ | Multimedia Fusion **1.0 / 1.1 / 1.2** standalone (`.exe`) | Builds 87 to 98 | an editable `.cca`, written as build 98 |
+| ✅ | Multimedia Fusion **1.5** standalone (`.exe`) or package (`.ccn`) | Builds 105 to 119 | an editable `.cca`, written as build 119 |
 | ✅ | **The Games Factory** standalone | 1.00 to 1.06 | an editable `.gam`, unprotected |
 | ✅ | **Click & Create** or **MMF Express** standalone | CnC 1.0 to 1.03, Express 1.04 to 1.06 | an editable `.cca`, unprotected |
 | ✅ | A **Vitalize** `.ccn` | Fusion 1.0 or 1.5 | an editable `.cca` |
 | ✅ | A **protected** `.gam` / `.cca` | TGF, CnC, Express | the same file with the protection undone |
-| ✅ | An **incomplete** copy, a download that stopped early | TGF, CnC, Express | named as one, and rebuilt without the assets whose bytes are missing, if you ask for that |
-| ❌ | Multimedia Fusion **2** and Clickteam Fusion **2.5** or later | | not supported |
+| ✅ | An **incomplete** copy, a download that stopped early | TGF, CnC, Express | option for an attempted rebuilt without the assets whose bytes are missing |
+| ❌ | Multimedia Fusion **2** and Clickteam Fusion **2.5** or later | | **not** supported |
 
-*MMF Express is a rebranded Click & Create.
+*MMF Express is a rebranded Click & Create.*
 
 Files are identified by **content, never by extension**: the signatures in
 the file decide what it is, so a renamed or mislabelled game still reads
@@ -90,10 +93,9 @@ so nothing can return them:
 | What | Why |
 |---|---|
 | Comment text | the compiler keeps the comment rows and their positions, and throws the words away |
-| Editor-only pictures | object icons and frame preview thumbnails are not stored in a compiled game |
+| Editor-only pictures | object icons and frame preview thumbnails are not stored in a compiled game. Klikback attempts to recreate from ingame artwork |
 | Global event page names | the events all survive and run as before; only the name of the page they were filed under is gone, so each one lands in its frame behind a clear label |
 | Global value names | the runtime keeps the values and never the names, so they come back as `Global Value A`, `B`, `C` |
-| Extension display names | a game records which extension files it uses, often not the name the editor showed; the filename stands in |
 
 That list is the same for every compiled game, whatever reads it. What
 KlikBack adds is telling you which of it applied to yours:
@@ -109,9 +111,6 @@ KlikBack adds is telling you which of it applied to yours:
 - **Nothing is overwritten.** Neither the game nor an existing project file
   is ever written over unless you ask for it explicitly.
 
-Comment positions can be put back as an option, off by default: the rows
-are real, the words are not, so every row it adds carries stand-in text the
-author never wrote.
 
 ## Layout
 
@@ -130,6 +129,7 @@ branding/         logo and icon
 
 ### pywebview
 
+Used because <img width="1672" height="929" alt="KBlogo" src="https://github.com/user-attachments/assets/242f7853-bac1-46c0-8812-810f175b4c89" />
 I wanted a Windows 98 style UI. Not entirely happy with it.
 
 ### About `core/`
