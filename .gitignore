@@ -1,0 +1,12 @@
+# Build output and caches. None of this belongs in the repository, and the
+# .pyc files in particular embed the absolute path of the machine that
+# compiled them.
+__pycache__/
+*.pyc
+# PyInstaller writes here; dist* and work* cover the alternate --distpath a
+# locked build falls back to.
+build/dist*/
+build/work*/
+# Settings written beside the app on first run: real local paths and a
+# recent-files list.
+klikback.json
