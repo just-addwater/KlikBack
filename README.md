@@ -6,11 +6,7 @@
 **Turn a compiled Multimedia Fusion 1.0/1.5, The Games Factory, MultiMedia Fusion Express or Click & Create
 game back into an editable project.**
 
-If you have an old Clickteam-era game and no longer have the source that
-built it, KlikBack rebuilds it and recovers the source. Point it at the game's `.exe`, `.gam`,
-`.cca` or `.ccn` and it writes a project file the original editor opens,
-carrying the frames, objects, events, artwork, sounds and extension modules
-that were inside the game.
+If you have an old Clickteam-era game and no longer have the source that built it, KlikBack rebuilds it and recovers the source. Point it at the game's `.exe`, `.gam`, `.cca` or `.ccn` and it writes a project file the original editor opens, carrying the frames, objects, events, artwork, sounds and extension modules that were inside the game.
 
 > [!CAUTION]
 > **KlikBack is a preservation tool. Use it on games you made, own the
@@ -18,9 +14,7 @@ that were inside the game.
 > Decompiling gives you no rights in a game, its assets, or the extension
 > modules it carries.**
 
-It runs offline on Windows, needs no copy of Multimedia Fusion installed,
-and never modifies the game you point it at. There is a window GUI and a
-command line, and the packaged app is a plain folder with no installer.
+It runs offline on Windows, needs no copy of Multimedia Fusion installed, and never modifies the game you point it at. There is a window GUI and a command line, and the packaged app is a plain folder with no installer.
 
 
 ## What it reads
@@ -38,23 +32,15 @@ command line, and the packaged app is a plain folder with no installer.
 
 *MMF Express is a rebranded Click & Create.*
 
-Files are identified by **content, never by extension**: the signatures in
-the file decide what it is, so a renamed or mislabelled game still reads
-correctly, and something that only looks like a game is told apart from one
-that is. The generation comes from the game's own package header, not from
-the version stamp an author can overwrite.
+Files are identified by **content, never by extension**: the signatures in the file decide what it is, so a renamed or mislabelled game still reads correctly, and something that only looks like a game is told apart from one that is. The generation comes from the game's own package header, not from the version stamp an author can overwrite.
 
 Multimedia Fusion 2 and later pack a game a different way so KlikBack cannot read it. If you need to decompile them, try https://github.com/AITYunivers/NebulaFD. 
 
-Extension modules (`.cox` / `.gox`) are carved out of the game itself, so a
-game that needs an extension your machine has never had still comes back
-with that extension beside it.
+Extension modules (`.cox` / `.gox`) are carved out of the game itself, so a game that needs an extension your machine has never had still comes back with that extension beside it.
 
 ## Running it
 
-Most people want the packaged app, a plain folder with no installer:
-download the zip, unzip, run `KlikBack.exe`. Its own `README.txt` covers
-the app and the options.
+Most people want the packaged app, a plain folder with no installer: download the zip, unzip, run `KlikBack.exe`. Its own `README.txt` covers the app and the options.
 
 From source, you need Python 3.13 or newer:
 
@@ -65,10 +51,7 @@ py -3 -m klikback.cli --identify "C:\old games"
 py -3 -m klikback.cli --help
 ```
 
-The command line is pure standard library, with no dependencies at all. The
-window (`py -3 -m klikback.gui`) additionally needs `pywebview`, and on
-Windows the Edge WebView2 runtime that ships with every up-to-date
-Windows 10 and 11.
+The command line is pure standard library, with no dependencies at all. The window (`py -3 -m klikback.gui`) additionally needs `pywebview`, and on Windows the Edge WebView2 runtime that ships with every up-to-date Windows 10 and 11.
 
 To build the packaged zip:
 
@@ -81,14 +64,9 @@ lands in `build/dist/`.
 
 ## What a decompile actually gives you
 
-**What comes back.** Every frame and its layout, every object and its
-properties, the whole event sheet, the image and sound banks, the
-application icons, and the extension modules the game was carrying. Object
-icons are redrawn from each object's own artwork, which is how the editor
-produced them in the first place.
+**What comes back.** Every frame and its layout, every object and its properties, the whole event sheet, the image and sound banks, the application icons, and the extension modules the game was carrying. Object icons are redrawn from each object's own artwork, which is how the editor produced them in the first place.
 
-**What compilation destroyed.** These are gone from the game file itself,
-so nothing can return them:
+**What compilation destroyed.** These are gone from the game file itself, so nothing can return them:
 
 | What | Why |
 |---|---|
@@ -96,9 +74,10 @@ so nothing can return them:
 | Editor-only pictures | object icons and frame preview thumbnails are not stored in a compiled game |
 | Global event page names | the events all survive and run as before; only the name of the page they were filed under is gone, so each one lands in its frame behind a clear label |
 | Global value names | the runtime keeps the values and never the names, so they come back as `Global Value A`, `B`, `C` |
+
 *TGF/CnC V 1.00 seems to keep comment text*
-That list is the same for every compiled game, whatever reads it. What
-KlikBack adds is telling you which of it applied to yours:
+
+That list is the same for every compiled game, whatever reads it. What KlikBack adds is telling you which of it applied to yours:
 
 - **Losses are itemised, not summarised.** Every line beginning `loss:` in
   the session log is content the writer knew it dropped, named with the
@@ -137,40 +116,20 @@ core/ is generated and re-generated in place, so hand edits are overwritten.
 
 ### Artwork
 
-Some object types ship with no icon of their own. KlikBack draws every icon
-it can from the game's own art, and falls back to the drawings in
-`core/artwork/`, which are this project's own work. In the packaged app
-that folder is visible beside the exe: replace a PNG and the substitutes
-change.
+Some object types ship with no icon of their own. KlikBack draws every icon it can from the game's own art, and falls back to the drawings in `core/artwork/`, which are this project's own work. In the packaged app that folder is visible beside the exe: replace a PNG and the substitutes change.
 
-Five of the nine names ship (`other.png`, `string.png`, `counter.png`,
-`lives.png`, `score.png`); the other four are empty drop-in slots, filled
-only by somebody who wants them. Each drawing is a 32x32 PNG, 8 bits per
-channel, full colour or
-256-colour palette, not interlaced, with transparency as an alpha channel or
-bright green. `resources.py` holds every name either icon family knows to
-that contract at startup, before a game is opened, because the alternative
-is a decompile stopping partway through over a file the person editing it
-never saw named.
+Five of the nine names ship (`other.png`, `string.png`, `counter.png`, `lives.png`, `score.png`); the other four are empty drop-in slots, filled only by somebody who wants them. Each drawing is a 32x32 PNG, 8 bits per channel, full colour or 256-colour palette, not interlaced, with transparency as an alpha channel or bright green. `resources.py` holds every name either icon family knows to that contract at startup, before a game is opened, because the alternative is a decompile stopping partway through over a file the person editing it never saw named.
 
 
 ## Licence, and what it does not cover
 
-KlikBack is free software: you can redistribute it and/or modify it under
-the terms of the GNU General Public License as published by the Free
-Software Foundation, either version 3 of the Licence, or (at your option)
-any later version.
+KlikBack is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the Licence, or (at your option) any later version.
 
-KlikBack is distributed in the hope that it will be useful, but **without
-any warranty**, without even the implied warranty of merchantability or
-fitness for a particular purpose. See the GNU General Public License for
-more details. The full text is in [LICENSE](LICENSE).
+KlikBack is distributed in the hope that it will be useful, but **without any warranty**, without even the implied warranty of merchantability or fitness for a particular purpose. See the GNU General Public License for more details. The full text is in [LICENSE](LICENSE).
 
 
 **KlikBack claims no rights in its output. The GPL applies only to
-KlikBack.** Decompilation does not grant rights in the original game, its
-assets, or extracted extension modules; use and redistribute them only when
-authorised.
+KlikBack.** Decompilation does not grant rights in the original game, its assets, or extracted extension modules; use and redistribute them only when authorised.
 
 
 - KlikBack is intended for lawful preservation, interoperability, repair, and migration of software that you own or are otherwise authorized to examine.
