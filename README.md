@@ -1,24 +1,24 @@
-# KlikBack: a decompiler for Clickteam games
+# KlikBack: a decompiler for MMF,TGF,CnC Clickteam games
 
-**Turn a compiled Multimedia Fusion, The Games Factory or Click & Create
+**Turn a compiled Multimedia Fusion 1.0/1.5, The Games Factory, MultiMedia Fusion Express or Click & Create
 game back into an editable project.**
 
 If you have an old Clickteam-era game and no longer have the source that
-built it, KlikBack rebuilds it. Point it at the game's `.exe`, `.gam`,
+built it, KlikBack rebuilds it and recovers the source. Point it at the game's `.exe`, `.gam`,
 `.cca` or `.ccn` and it writes a project file the original editor opens,
 carrying the frames, objects, events, artwork, sounds and extension modules
 that were inside the game.
 
-It runs offline on Windows, needs no copy of Multimedia Fusion installed,
-and never modifies the game you point it at. There is a window and a
-command line, and the packaged app is a plain folder with no installer.
-
+> [!CAUTION]
 > **KlikBack is a preservation tool. Use it on games you made, own the
 > copyright to, or have the rights holder's permission to work on.
 > Decompiling gives you no rights in a game, its assets, or the extension
 > modules it carries.**
 
-By Justaddwater · <https://github.com/just-addwater/KlikBack>
+It runs offline on Windows, needs no copy of Multimedia Fusion installed,
+and never modifies the game you point it at. There is a window and a
+command line, and the packaged app is a plain folder with no installer.
+
 
 ## What it reads
 
@@ -31,11 +31,9 @@ By Justaddwater · <https://github.com/just-addwater/KlikBack>
 | ✅ | A **Vitalize** `.ccn` | Fusion 1.0 or 1.5 | an editable `.cca` |
 | ✅ | A **protected** `.gam` / `.cca` | TGF, CnC, Express | the same file with the protection undone |
 | ✅ | An **incomplete** copy, a download that stopped early | TGF, CnC, Express | named as one, and rebuilt without the assets whose bytes are missing, if you ask for that |
-| ❌ | Multimedia Fusion **2** and Clickteam Fusion **2.5** or later | | recognised and named; nothing is written |
+| ❌ | Multimedia Fusion **2** and Clickteam Fusion **2.5** or later | | not supported |
 
-MMF Express is a rebranded Click & Create and reads as one. A `.ccn` is the
-packed format Vitalize plays, and is read as whichever generation of
-Multimedia Fusion produced it.
+*MMF Express is a rebranded Click & Create.
 
 Files are identified by **content, never by extension**: the signatures in
 the file decide what it is, so a renamed or mislabelled game still reads
@@ -43,9 +41,7 @@ correctly, and something that only looks like a game is told apart from one
 that is. The generation comes from the game's own package header, not from
 the version stamp an author can overwrite.
 
-Multimedia Fusion 2 and later pack a game a different way, and nothing here
-can read it. KlikBack says so by name rather than starting on a file it
-cannot finish.
+Multimedia Fusion 2 and later pack a game a different way so KlikBack cannot read it. If you need to decompile them, try https://github.com/AITYunivers/NebulaFD. 
 
 Extension modules (`.cox` / `.gox`) are carved out of the game itself, so a
 game that needs an extension your machine has never had still comes back
@@ -132,11 +128,14 @@ build/            PyInstaller spec, build script, packaged README
 branding/         logo and icon
 ```
 
+### pywebview
+
+I wanted a Windows 98 style UI. Not entirely happy with it.
+
 ### About `core/`
 
 These modules carry a **GENERATED** header, and they are. They come from a
-separate codebase, not part of this distribution, where the format work
-happens. The generator strips its comments and writes these files with
+separate codebase, not part of this distribution. The generator strips its comments and writes these files with
 documentation of their own, and an equivalence check proves the two sides
 are the same program, differing only in prose.
 
