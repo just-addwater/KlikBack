@@ -43,6 +43,10 @@ Extension modules (`.cox` / `.gox`) are carved out of the game itself, so a game
 
 Most people want the packaged app, a plain folder with no installer: download the zip, unzip, run `KlikBack.exe`. Its own `README.txt` covers the app and the options.
 
+| Version | SHA-256 |
+|---|---|
+| 1.0.0 .exe | 353af7a5ad3ce6363314d71b31bcc780ecf9845b5b530999659cc5d64159574f |
+
 From source, you need Python 3.13 or newer:
 
 ```bash
@@ -76,7 +80,7 @@ lands in `build/dist/`.
 | Global event page names | the events all survive and run as before; only the name of the page they were filed under is gone, so each one lands in its frame behind a clear label |
 | Global value names | the runtime keeps the values and never the names, so they come back as `Global Value A`, `B`, `C` |
 
-*TGF/CnC V 1.00 seems to keep comment text*
+*TGF/CnC V 1.00 exports seems to keep comment text*
 
 That list is the same for every compiled game, whatever reads it. What KlikBack adds is telling you which of it applied to yours:
 
