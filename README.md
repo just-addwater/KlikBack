@@ -1,7 +1,7 @@
 
 <img width="836" height="464" alt="KBlogo" src="https://github.com/user-attachments/assets/66062c45-83cf-421b-bbc8-de65c25a6b37" />
 
-# KlikBack: a decompiler for MMF,TGF,CnC Clickteam games
+# KlikBack: a decompiler for MMF, TGF, CnC Clickteam games
 
 **Turn a compiled Multimedia Fusion 1.0/1.5, The Games Factory, MultiMedia Fusion Express or Click & Create
 game back into an editable project.**
@@ -19,7 +19,7 @@ that were inside the game.
 > modules it carries.**
 
 It runs offline on Windows, needs no copy of Multimedia Fusion installed,
-and never modifies the game you point it at. There is a window and a
+and never modifies the game you point it at. There is a window GUI and a
 command line, and the packaged app is a plain folder with no installer.
 
 
@@ -54,7 +54,7 @@ with that extension beside it.
 
 Most people want the packaged app, a plain folder with no installer:
 download the zip, unzip, run `KlikBack.exe`. Its own `README.txt` covers
-the app, the SmartScreen warning, and the options.
+the app and the options.
 
 From source, you need Python 3.13 or newer:
 
@@ -93,10 +93,10 @@ so nothing can return them:
 | What | Why |
 |---|---|
 | Comment text | the compiler keeps the comment rows and their positions, and throws the words away |
-| Editor-only pictures | object icons and frame preview thumbnails are not stored in a compiled game. Klikback attempts to recreate from ingame artwork |
+| Editor-only pictures | object icons and frame preview thumbnails are not stored in a compiled game |
 | Global event page names | the events all survive and run as before; only the name of the page they were filed under is gone, so each one lands in its frame behind a clear label |
 | Global value names | the runtime keeps the values and never the names, so they come back as `Global Value A`, `B`, `C` |
-
+*TGF/CnC V 1.00 seems to keep comment text*
 That list is the same for every compiled game, whatever reads it. What
 KlikBack adds is telling you which of it applied to yours:
 
@@ -124,23 +124,16 @@ src/klikback/
     mmf1/  mmf15/  tgf/  common/
     artwork/      the drawings used where a game has no icon of its own
 build/            PyInstaller spec, build script, packaged README
-branding/         logo and icon
+branding/         icon
 ```
 
 ### pywebview
 
-Used because <img width="1672" height="929" alt="KBlogo" src="https://github.com/user-attachments/assets/242f7853-bac1-46c0-8812-810f175b4c89" />
-I wanted a Windows 98 style UI. Not entirely happy with it.
+Used because I wanted a Windows 98 style UI. Not entirely happy with it.
 
 ### About `core/`
 
-These modules carry a **GENERATED** header, and they are. They come from a
-separate codebase, not part of this distribution. The generator strips its comments and writes these files with
-documentation of their own, and an equivalence check proves the two sides
-are the same program, differing only in prose.
-
-So read `core/` as it stands, but do not hand-edit it: the next generation
-overwrites whatever you change.
+core/ is generated and re-generated in place, so hand edits are overwritten.
 
 ### Artwork
 
@@ -160,15 +153,6 @@ that contract at startup, before a game is opened, because the alternative
 is a decompile stopping partway through over a file the person editing it
 never saw named.
 
-## Provenance
-
-What KlikBack writes is built from scratch rather than copied from an
-existing project, and the format knowledge behind it was worked out here.
-
-The vocabulary of the format itself is another matter, and does travel: any
-file the editor will open has to carry things like the runtime's class
-names, the object type labels and the standard animation slot names. They
-are there because a file without them is not one the editor can read.
 
 ## Licence, and what it does not cover
 
@@ -182,17 +166,15 @@ any warranty**, without even the implied warranty of merchantability or
 fitness for a particular purpose. See the GNU General Public License for
 more details. The full text is in [LICENSE](LICENSE).
 
-In practice: use it for anything, including commercially, but if you
-distribute a modified KlikBack you have to publish your changes under the
-same licence.
 
 **KlikBack claims no rights in its output. The GPL applies only to
 KlikBack.** Decompilation does not grant rights in the original game, its
 assets, or extracted extension modules; use and redistribute them only when
 authorised.
 
-- Use only with games you own or are authorised to analyse.
-- Intended for lawful interoperability, recovery, research and preservation.
+
+- KlikBack is intended for lawful preservation, interoperability, repair, and migration of software that you own or are otherwise authorized to examine.
+- Some supported legacy formats describe projects as “protected.” KlikBack can convert these files into editable project formats. In this documentation, protected describes a technical state in the file format; it is not a legal conclusion about whether conversion is permitted in any particular country or situation.
 - Not affiliated with or endorsed by Clickteam.
 - Clickteam and product names are trademarks of their respective owners.
 - Extracted modules remain subject to their original licences.
