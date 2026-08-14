@@ -1,0 +1,8 @@
+# The pinned build environment for the shipped zip.
+# Interpreter: Python 3.13.2, 64-bit Windows.
+pyinstaller==6.15.0
+# The GUI layer's only dependencies (pywebview pulls in the rest).
+pywebview==6.2.1
+pythonnet==3.1.0
+clr_loader==0.3.1
+proxy_tools==0.1.0
