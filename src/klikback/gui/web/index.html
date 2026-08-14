@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>KlikBack</title>
+<link rel="icon" href="klikback.ico">
+<link rel="stylesheet" href="98.css">
+<link rel="stylesheet" href="klikback.css">
+</head>
+<body>
+<div class="window kb-main">
+  <div class="kb-topbar">
+    <span class="kb-topbar-side"></span>
+    <div class="kb-wordmark">
+      <img src="klikback.ico" width="16" height="16" alt="">
+      <span class="kb-wordmark-name">KlikBack</span>
+      <span id="topbar-version" class="kb-fine"></span>
+    </div>
+    <span class="kb-topbar-side kb-topbar-right">
+      <a id="github-link" href="https://github.com/just-addwater/KlikBack"
+         target="_blank" rel="noopener"
+         data-tip="KlikBack's home page: source code, releases and issue reporting.">github.com/just-addwater/KlikBack</a>
+    </span>
+  </div>
+  <div class="window-body kb-body">
+   <div class="kb-col kb-stack">
+
+    <div id="drop-well" class="sunken-panel kb-drop-well" tabindex="0">
+      <!-- Drawn rather than typed: the old glyph was a font character, so
+           its weight and shape were whatever the installed font decided.
+           An arrow falling into an open tray says "drop" without a word. -->
+      <div class="kb-drop-glyph" aria-hidden="true">
+        <svg viewBox="0 0 48 44" width="52" height="48">
+          <path class="kb-arrow-shaft" d="M24 4 v20" />
+          <path class="kb-arrow-head" d="M15 20 l9 9 l9 -9" />
+          <path class="kb-tray" d="M8 30 v7 h32 v-7" />
+        </svg>
+      </div>
+      <div class="kb-drop-title">Drop a game here</div>
+      <div class="kb-drop-sub">
+        MMF 1.0 / 1.5 standalones &middot; TGF / Click &amp; Create games
+        &middot; .gam&ensp;.cca&ensp;.ccn
+      </div>
+      <div class="kb-drop-hint">Drop more games here</div>
+      <div class="field-row kb-drop-buttons">
+        <button id="browse-button"
+                data-tip="Pick game files with a file dialog (Ctrl+O). You can also drop files or a whole folder anywhere on this window.">Browse&hellip;</button>
+        <span class="kb-recent-wrap">
+          <button id="recent-button" disabled aria-haspopup="true"
+                  data-tip="Games you opened before. Pick one to put it back in the list.">Recent&nbsp;&#9662;</button>
+          <div id="recent-menu" class="kb-menu kb-hidden"></div>
+        </span>
+        <input id="path-box" type="text"
+               placeholder="or paste a file / folder path"
+               spellcheck="false">
+        <button id="add-path-button"
+                data-tip="Add the typed path to the list. A folder is searched for every game inside it.">Add</button>
+      </div>
+    </div>
+
+    <fieldset id="inspect-card" class="kb-hidden">
+      <legend id="inspect-title">File</legend>
+      <div class="kb-inspect-row">
+        <div id="inspect-icon" class="kb-inspect-icon"></div>
+        <div id="inspect-lines" class="kb-inspect-lines"></div>
+      </div>
+    </fieldset>
+
+    <div id="queue-wrap" class="sunken-panel kb-queue kb-hidden">
+      <table class="kb-queue-table">
+        <thead>
+          <tr><th>File</th><th>What it is</th><th>Status</th>
+              <th class="kb-remove-head"></th></tr>
+        </thead>
+        <tbody id="queue-body"></tbody>
+      </table>
+    </div>
+
+    <fieldset id="options-box">
+      <legend>Options</legend>
+      <div class="field-row kb-out-row"
+           data-tip="Where the rebuilt projects go. Leave it empty to write beside each game file.">
+        <label for="out-dir">Output folder</label>
+        <input id="out-dir" type="text"
+               placeholder="beside each input" spellcheck="false">
+        <button id="out-browse">Choose&hellip;</button>
+      </div>
+      <div class="kb-fine kb-out-hint">Leave the folder blank to write
+        beside each game file.</div>
+      <div class="kb-option-columns">
+        <div>
+          <div class="field-row"
+               data-tip="Games often carry their plug-in objects (extensions) inside the EXE. This saves each one into a subfolder beside the output, so the editor can find them.">
+            <input id="opt-extensions" type="checkbox" checked>
+            <label for="opt-extensions">Extract extensions into a subfolder</label>
+          </div>
+          <div class="field-row"
+               data-tip="Give every game its own subfolder, named after the game, inside the output folder. Keeps a batch of games from mixing their files together.">
+            <input id="opt-pergame" type="checkbox">
+            <label for="opt-pergame">Each game into its own folder</label>
+          </div>
+        </div>
+        <div>
+          <div class="field-row"
+               data-tip="Replace output files that already exist. Your original game files are never touched either way &mdash; that rule has no off switch.">
+            <input id="opt-force" type="checkbox">
+            <label for="opt-force">Overwrite existing output</label>
+          </div>
+          <div class="field-row"
+               data-tip="Write this report to a text file next to each rebuilt project, named after the game. Turn it off to leave no file behind &mdash; the report still appears here, and Copy log still works.">
+            <input id="opt-log" type="checkbox" checked>
+            <label for="opt-log">Save a log beside the output</label>
+          </div>
+        </div>
+      </div>
+
+      <details id="recovery-options" class="kb-advanced">
+        <summary data-tip="Choices about how much KlikBack reconstructs when the original information is partly gone. The defaults are safe.">Recovery options</summary>
+        <div class="kb-option-columns">
+          <div>
+            <div class="field-row"
+                 data-tip="Rebuild the project&rsquo;s application icons from the icons stored inside the game&rsquo;s EXE. Turn it off to keep the editor&rsquo;s plain defaults instead.">
+              <input id="opt-appicons" type="checkbox" checked>
+              <label for="opt-appicons">Recover application icons</label>
+            </div>
+            <div class="field-row"
+                 data-tip="Compiled games forget which object owned some event pages. Keep this on to save those pages into the frame with an honest &lsquo;OWNER UNKNOWN&rsquo; note. Turn it off and such games are refused instead.">
+              <input id="opt-ownerless" type="checkbox" checked>
+              <label for="opt-ownerless">Recover ownerless behaviours / globals</label>
+            </div>
+          </div>
+          <div>
+            <div class="field-row"
+                 data-tip="Not recommended. Puts a comment row back at every position where the author had one. The position is real, but the original words are gone for good, so every row it adds carries stand-in text the author never wrote &mdash; on a large game that can be tens of thousands of rows. It is also the one option that can stop a decompile that otherwise works: a program where the compiler left an event group open has a row KlikBack put back rather than the author, and the recovery cannot number it. If a game fails with this on, turning it off is the first thing to rule out.">
+              <input id="opt-comments" type="checkbox">
+              <label for="opt-comments">Recover comment positions
+                <span class="kb-fine">(substituted text, not recommended)</span></label>
+            </div>
+          </div>
+        </div>
+        <div id="options-1996" class="kb-option-columns kb-hidden">
+          <div class="field-row"
+               data-tip="Protected 1996 games had their icons and preview pictures stripped out. This writes blank stand-ins so the editor has something to show &mdash; the original pictures are gone either way.">
+            <input id="opt-artwork" type="checkbox" checked>
+            <label for="opt-artwork">TGF/CnC: substitute blank icons / thumbnails</label>
+          </div>
+          <div class="field-row"
+               data-tip="Some 1996 image banks open fine in their own editor but not in MMF 1.5. This re-encodes just those pictures &mdash; exactly where the image record still describes itself, and as a best-effort fill where the picture is already missing from the file. Off by default: without it the bank is byte-identical to the original.">
+            <input id="opt-repairbank" type="checkbox">
+            <label for="opt-repairbank">TGF/CnC: re-encode bank images MMF refuses</label>
+          </div>
+          <div class="field-row"
+               data-tip="MMF 1.5 can refuse a whole 1996 project over the order one level lists its object placements in, while all three 1996 editors open the same file happily. This rewrites that order &mdash; a few dozen bytes. The placements themselves do not move, so what is on top of what is unchanged; only the order the objects were placed in. Off by default, and a level already in order is unaffected either way.">
+            <input id="opt-repackplacement" type="checkbox">
+            <label for="opt-repackplacement">TGF/CnC: reorder placement pointers MMF refuses</label>
+          </div>
+          <div class="field-row"
+               data-tip="Some 1996 downloads stopped before the file was finished, so the last sound or image bank runs off the end. Everything before that point is intact. This opens the game anyway by dropping the assets whose bytes are not in the file &mdash; nothing is invented, nothing else moves, and what is dropped was already gone. Off by default: without it an incomplete copy is refused and says so.">
+            <input id="opt-dropmissing" type="checkbox">
+            <label for="opt-dropmissing">TGF/CnC: open an incomplete copy
+              <span class="kb-fine">(drops missing assets)</span></label>
+          </div>
+        </div>
+      </details>
+
+      <details id="extensions-option" class="kb-advanced">
+        <summary>Installed extensions (optional)</summary>
+        <div class="kb-ext-note">
+          Games carry their extension objects, but often not the names
+          the editor displays for them. If Multimedia Fusion is
+          installed, point KlikBack at its <b>Extensions</b> folder and
+          the missing names are recovered from your installed copies —
+          you are also warned if an installed extension is older than
+          the one the game was built with. KlikBack only
+          <b>scans</b> this folder: nothing in it is copied or changed.
+          Leave it blank to skip the scan; games still decompile either
+          way.
+        </div>
+        <div class="field-row kb-out-row">
+          <label for="ext-dir">Extensions folder</label>
+          <input id="ext-dir" type="text"
+                 placeholder="for example C:\Multimedia Fusion\Extensions"
+                 spellcheck="false">
+          <button id="ext-browse">Choose&hellip;</button>
+        </div>
+      </details>
+    </fieldset>
+
+    <fieldset id="result-pane" class="kb-hidden">
+      <legend>Result</legend>
+      <div id="result-banner" class="kb-banner">
+        <div class="kb-banner-line">
+          <span id="result-banner-icon" class="kb-banner-icon"></span>
+          <span id="result-banner-text"></span>
+        </div>
+        <div id="result-written" class="kb-written kb-hidden"></div>
+      </div>
+      <div id="result-advice" class="kb-advice kb-hidden"></div>
+      <div class="field-row kb-result-buttons">
+        <button id="open-folder-button" class="kb-hidden"
+                data-tip="Show the rebuilt project in Explorer.">Open folder</button>
+        <button id="save-log-button"
+                data-tip="Save this report as a text file. A copy is already written beside the output automatically.">Save log&hellip;</button>
+        <button id="copy-log-button"
+                data-tip="Put this report on the clipboard, ready to paste into a bug report or a forum post.">Copy log</button>
+        <span id="session-log-note" class="kb-fine"></span>
+      </div>
+      <div class="kb-result-more">
+        <details id="loss-details" class="kb-hidden">
+          <summary id="loss-summary"
+                   data-tip="Content the engine knows it could not bring back &mdash; each line says what and why. Expected items are normal for every compiled game.">Details</summary>
+          <p id="loss-note" class="kb-loss-note kb-hidden"></p>
+          <ul id="loss-list" class="kb-loss-list"></ul>
+          <div id="expected-losses"></div>
+        </details>
+        <details id="log-details">
+          <summary>Full report</summary>
+          <pre id="log-text" class="kb-log"></pre>
+        </details>
+      </div>
+    </fieldset>
+
+   </div>
+  </div>
+
+  <!-- Pinned: the bar and the run buttons stay put while the page above
+       them scrolls, so a long run can be watched and stopped from
+       wherever the reader happens to be. -->
+  <div class="kb-actionbar">
+    <div class="kb-col">
+      <div class="field-row kb-run-row">
+        <div id="progress" class="kb-progress" role="progressbar"
+             aria-label="Decompile progress"
+             aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div id="progress-bar" class="kb-progress-fill"></div>
+        </div>
+        <span id="progress-text" class="kb-progress-percent"></span>
+        <button id="go-button" class="default" disabled
+                data-tip="Turn every game in the list back into an editable project.">Decompile</button>
+        <button id="cancel-button" disabled
+                data-tip="Stop the current run. Nothing half-written is left behind.">Cancel</button>
+        <button id="clear-button"
+                data-tip="Empty the list. Files on disk are not touched.">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="status-bar kb-status">
+    <p id="status-main" class="status-bar-field">Ready</p>
+    <p id="status-right" class="status-bar-field kb-status-right"></p>
+  </div>
+  <!-- What the status line says, for a screen reader. A separate node
+       because the visible field re-writes itself several times a second
+       to animate its ellipsis, and a live region on that would babble;
+       this one is written only when the state actually changes. -->
+  <p id="status-announce" class="kb-offscreen" role="status"
+     aria-live="polite"></p>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

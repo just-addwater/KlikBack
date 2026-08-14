@@ -1,0 +1,237 @@
+/* INTERIM STYLESHEET -- this is NOT jdan/98.css.
+ *
+ * The plan of record vendors 98.css (MIT, https://github.com/jdan/98.css)
+ * plus its pixelated font files, but the build machine was offline when
+ * phase 4 landed, so this file is an original, hand-drawn approximation of
+ * the Windows 98 control look using the same class names 98.css defines
+ * (.window, .title-bar, .field-row, .sunken-panel, .status-bar, plain
+ * button/input/fieldset). When the real 98.css is vendored, replace this
+ * file's contents wholesale and add the font files beside it -- index.html
+ * and klikback.css need no change. Its .progress-indicator rules will
+ * arrive unused: KlikBack's progress bar is deliberately not a 98 control.
+ */
+
+:root {
+  --surface: #c0c0c0;
+  --button-highlight: #ffffff;
+  --button-face: #dfdfdf;
+  --button-shadow: #808080;
+  --window-frame: #0a0a0a;
+  --dialog-blue: #000080;
+  --dialog-blue-light: #1084d0;
+  --link-blue: #0000ff;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--surface);
+  color: #222;
+  /* Readability beats period accuracy here (user's call): Segoe UI at
+   * 13px with normal antialiasing. If the real 98.css is ever vendored,
+   * keep this size and stack for body text -- its 11px pixel font is the
+   * part of the look that was actively hard to read.
+   *
+   * "Segoe UI Variable Text" leads because Windows 11 ships optical-size
+   * cuts of the same design, and Text is the one drawn for body sizes.
+   * Windows 10 has no such family and falls through to plain Segoe UI at
+   * no cost -- a font-family name that names nothing is simply skipped. */
+  font-family: "Segoe UI Variable Text", "Segoe UI", Tahoma,
+               "Microsoft Sans Serif", sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* Raised outer bevel: a window or a button at rest. */
+.window,
+button {
+  background: var(--surface);
+  box-shadow: inset -1px -1px var(--window-frame),
+              inset 1px 1px var(--button-highlight),
+              inset -2px -2px var(--button-shadow),
+              inset 2px 2px var(--button-face);
+}
+
+.window {
+  padding: 3px;
+}
+
+.window-body {
+  margin: 3px;
+}
+
+.title-bar {
+  background: linear-gradient(90deg, var(--dialog-blue),
+                                     var(--dialog-blue-light));
+  color: #fff;
+  padding: 3px 4px;
+  display: flex;
+  align-items: center;
+  font-weight: bold;
+}
+
+button {
+  border: none;
+  padding: 4px 12px;
+  min-height: 25px;
+  min-width: 74px;
+  font: inherit;
+  color: inherit;
+}
+
+button:not(:disabled):active {
+  box-shadow: inset -1px -1px var(--button-highlight),
+              inset 1px 1px var(--window-frame),
+              inset -2px -2px var(--button-face),
+              inset 2px 2px var(--button-shadow);
+  padding: 5px 11px 3px 13px;
+}
+
+button:focus-visible {
+  outline: 1px dotted #000;
+  outline-offset: -5px;
+}
+
+button:disabled {
+  color: var(--button-shadow);
+  text-shadow: 1px 1px 0 var(--button-highlight);
+}
+
+button.default {
+  box-shadow: 0 0 0 1px var(--window-frame),
+              inset -1px -1px var(--window-frame),
+              inset 1px 1px var(--button-highlight),
+              inset -2px -2px var(--button-shadow),
+              inset 2px 2px var(--button-face);
+}
+
+/* Sunken bevel: text boxes, wells, lists. */
+input[type="text"],
+.sunken-panel,
+pre {
+  background: #fff;
+  box-shadow: inset -1px -1px var(--button-highlight),
+              inset 1px 1px var(--button-shadow),
+              inset -2px -2px var(--button-face),
+              inset 2px 2px var(--window-frame);
+  border: none;
+}
+
+input[type="text"] {
+  padding: 4px 6px;
+  min-height: 23px;
+  font: inherit;
+}
+
+input[type="text"]:focus {
+  outline: none;
+}
+
+input[type="checkbox"] {
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  margin: 0 6px 0 0;
+  background: #fff;
+  box-shadow: inset -1px -1px var(--button-highlight),
+              inset 1px 1px var(--button-shadow),
+              inset -2px -2px var(--button-face),
+              inset 2px 2px var(--window-frame);
+  position: relative;
+  flex: none;
+}
+
+input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 7px;
+  height: 7px;
+  background:
+    conic-gradient(from 0deg, #000 0 100%) no-repeat;
+  clip-path: polygon(14% 45%, 0 65%, 40% 100%, 100% 16%, 80% 0%, 40% 62%);
+}
+
+input[type="checkbox"]:focus-visible + label {
+  outline: 1px dotted #000;
+}
+
+label { user-select: none; }
+
+fieldset {
+  border-image: none;
+  border: none;
+  margin: 0;
+  padding: 8px 10px 10px;
+  box-shadow: inset -1px -1px var(--button-highlight),
+              inset 1px 1px var(--button-shadow),
+              inset -2px -2px var(--button-shadow),
+              inset 2px 2px var(--button-highlight);
+}
+
+legend {
+  background: var(--surface);
+  padding: 0 4px;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+}
+
+.status-bar {
+  display: flex;
+  gap: 2px;
+  margin: 3px 3px 0;
+}
+
+.status-bar-field {
+  box-shadow: inset -1px -1px var(--button-highlight),
+              inset 1px 1px var(--button-shadow);
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 3px 6px;
+  min-height: 19px;
+}
+
+/* No .progress-indicator here on purpose: KlikBack's progress bar is the
+ * one control the user exempted from the 98 look, so it is drawn entirely
+ * in klikback.css and uses none of these class names. */
+
+table {
+  border-collapse: collapse;
+  font: inherit;
+  width: 100%;
+}
+
+th {
+  text-align: left;
+  font-weight: normal;
+  background: var(--surface);
+  box-shadow: inset -1px -1px var(--button-shadow),
+              inset 1px 1px var(--button-highlight);
+  padding: 2px 8px;
+  position: sticky;
+  top: 0;
+}
+
+td {
+  padding: 2px 8px;
+}
+
+details > summary {
+  cursor: default;
+  user-select: none;
+}
+
+pre {
+  font-family: Consolas, "Cascadia Mono", "Courier New", monospace;
+  font-size: 12px;
+  margin: 4px 0 0;
+  padding: 6px;
+}

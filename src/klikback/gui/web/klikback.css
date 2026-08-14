@@ -1,0 +1,922 @@
+/* KlikBack's own layout on top of the 98 control look. Everything here is
+ * arrangement, sizing and app-specific states; the widget chrome lives in
+ * 98.css so the vendored original can replace it untouched. */
+
+/* The window is a fixed frame with one scrolling middle, not a long page.
+ *
+ * At the default 780x680 the page was 851px tall once a result appeared,
+ * which put the Result pane, the progress bar, the run buttons and the
+ * status line all below the fold together: reading what happened meant
+ * scrolling the controls away. Now the frame is exactly the viewport, the
+ * action bar and the status bar are pinned to the bottom of it, and only
+ * the content between the top bar and the action bar scrolls. */
+.kb-main {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* The scroll container is full width so its scrollbar sits at the window
+ * edge; the readable column is the child inside it. `min-height: 0` is
+ * what lets a flex child shrink below its content and actually scroll. */
+.kb-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* The readable column, shared by the scrolling content and the pinned
+ * action bar so the Decompile button lines up with everything above it.
+ * On a big or high-resolution display the window can be maximised;
+ * capping the column keeps lines readable instead of letting a 4K width
+ * stretch every row across the screen. */
+.kb-col {
+  width: 100%;
+  max-width: 920px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.kb-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 2px;
+  padding-bottom: 8px;
+}
+
+/* The pinned strip. The groove above it is the 98 idiom for "this belongs
+ * to the frame, not to the page" -- the same pair of lines the status bar
+ * uses -- which is exactly what the separation means here. */
+.kb-actionbar {
+  flex: none;
+  padding: 4px 0 5px;
+  border-top: 1px solid var(--button-shadow);
+  box-shadow: inset 0 1px 0 var(--button-highlight);
+}
+
+.kb-actionbar .kb-run-row { margin: 0; }
+
+.kb-hidden { display: none !important; }
+
+/* Present for a screen reader, absent for everyone else. Not `display:
+ * none` and not `visibility: hidden`, because both take the element out of
+ * the accessibility tree as well, which would silence the very thing this
+ * exists to say. */
+.kb-offscreen {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* --- scrollbars, the 98 way --------------------------------------------- */
+
+/* WebView2 draws overlay scrollbars by default; these give every
+ * scrolling region the classic dithered track and bevelled thumb. */
+::-webkit-scrollbar {
+  width: 16px;
+  height: 16px;
+}
+
+::-webkit-scrollbar-track {
+  /* The 2px checkerboard dither of the original track. */
+  background: repeating-conic-gradient(#fff 0% 25%, #dfdfdf 0% 50%)
+              0 0 / 2px 2px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--button-face, #c0c0c0);
+  box-shadow: inset -1px -1px var(--window-frame, #0a0a0a),
+              inset 1px 1px var(--button-highlight, #fff),
+              inset -2px -2px var(--button-shadow, #808080),
+              inset 2px 2px var(--button-face, #c0c0c0);
+}
+
+::-webkit-scrollbar-button { display: none; }
+
+::-webkit-scrollbar-corner { background: var(--button-face, #c0c0c0); }
+
+.kb-fine {
+  color: #555;
+  font-size: 12px;
+}
+
+/* --- the top bar -------------------------------------------------------- */
+
+/* Three columns rather than a flex row, and the outer two share a width:
+ * that is what keeps the name in the middle of the WINDOW rather than in
+ * the middle of whatever space the link left over. */
+.kb-topbar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 12px 3px;
+  user-select: none;
+}
+
+.kb-topbar-side { min-width: 0; }
+
+.kb-topbar-right {
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kb-wordmark {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kb-wordmark img {
+  width: 16px;
+  height: 16px;
+  image-rendering: pixelated;
+}
+
+.kb-wordmark-name {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: #1c1c1c;
+}
+
+.kb-topbar a {
+  color: var(--link-blue);
+  font-size: 12px;
+}
+
+/* --- the drop well ----------------------------------------------------- */
+
+.kb-drop-well {
+  position: relative;
+  padding: 20px 16px 14px;
+  text-align: center;
+  background: linear-gradient(180deg, #d6d6d6 0%, #c9c9c9 100%);
+}
+
+/* The dashed target lives on an inset overlay so it sits inside the
+ * sunken bevel without fighting it.
+ *
+ * Four gradients rather than `border: dashed`, because a CSS dashed
+ * border's dash length is the browser's business: it stretches the
+ * pattern to fit each edge, so the corners rarely agree and the rhythm
+ * changes with the window. These are 11px of line and 8px of gap
+ * exactly, on every edge, at every size -- and being backgrounds they
+ * can march, which is what the well does while something is over it. */
+.kb-drop-well::before {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(90deg, #8c8c8c 0 11px, transparent 11px 19px),
+    repeating-linear-gradient(90deg, #8c8c8c 0 11px, transparent 11px 19px),
+    repeating-linear-gradient(180deg, #8c8c8c 0 11px, transparent 11px 19px),
+    repeating-linear-gradient(180deg, #8c8c8c 0 11px, transparent 11px 19px);
+  background-size: 100% 2px, 100% 2px, 2px 100%, 2px 100%;
+  background-position: 0 0, 0 100%, 0 0, 100% 0;
+  background-repeat: repeat-x, repeat-x, repeat-y, repeat-y;
+  transition: background-color 120ms;
+  /* Declared here and merely PAUSED, never added and removed. An
+   * animation that is switched on by a class restarts from its first
+   * frame every time the class comes back, and the drag state comes back
+   * often; pausing holds the phase, so the dashes carry on from wherever
+   * they had got to. */
+  animation: kb-ants 700ms linear infinite;
+  animation-play-state: paused;
+}
+
+.kb-drop-well.kb-drag-over {
+  background: linear-gradient(180deg, #eef4fd 0%, #dfeafb 100%);
+}
+
+/* Live target: the dashes turn blue and walk clockwise -- top rightwards,
+ * right downwards, and so on round -- which is the marching-ants idiom
+ * every file manager uses for "this is where it will land". */
+.kb-drop-well.kb-drag-over::before {
+  background-image:
+    repeating-linear-gradient(90deg, var(--dialog-blue-light) 0 11px,
+      transparent 11px 19px),
+    repeating-linear-gradient(90deg, var(--dialog-blue-light) 0 11px,
+      transparent 11px 19px),
+    repeating-linear-gradient(180deg, var(--dialog-blue-light) 0 11px,
+      transparent 11px 19px),
+    repeating-linear-gradient(180deg, var(--dialog-blue-light) 0 11px,
+      transparent 11px 19px);
+  animation-play-state: running;
+}
+
+/* One period of the pattern is 19px, so a 19px walk loops seamlessly. */
+@keyframes kb-ants {
+  to {
+    background-position: 19px 0, -19px 100%, 0 -19px, 100% 19px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kb-drop-well::before,
+  .kb-drop-well.kb-drag-over::before { animation: none; }
+}
+
+.kb-drop-glyph {
+  line-height: 0;
+  margin-bottom: 8px;
+}
+
+/* Round caps and joins, and a lighter tray than the arrow, so the arrow
+ * is the thing that reads first and the tray is the place it lands. */
+.kb-drop-glyph svg {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  overflow: visible;
+}
+
+.kb-arrow-shaft,
+.kb-arrow-head {
+  stroke: var(--dialog-blue);
+  stroke-width: 5;
+  transition: transform 140ms ease-out;
+}
+
+.kb-tray {
+  stroke: #7d7d8a;
+  stroke-width: 4;
+}
+
+/* The arrow drops into the tray while a file is over the window, and the
+ * tray brightens to meet it. */
+.kb-drop-well.kb-drag-over .kb-arrow-shaft,
+.kb-drop-well.kb-drag-over .kb-arrow-head {
+  transform: translateY(3px);
+}
+
+.kb-drop-well.kb-drag-over .kb-tray {
+  stroke: var(--dialog-blue);
+}
+
+/* The one line big enough to want the Display cut on Windows 11, which is
+ * drawn for headline sizes; everything else stays on the body stack. */
+.kb-drop-title {
+  font-family: "Segoe UI Variable Display", "Segoe UI", Tahoma, sans-serif;
+  font-size: 21px;
+  margin-bottom: 4px;
+}
+
+.kb-drop-sub {
+  color: #555;
+  margin-bottom: 10px;
+}
+
+.kb-drop-buttons {
+  justify-content: center;
+}
+
+.kb-drop-buttons input {
+  flex: 1 1 auto;
+  max-width: 340px;
+}
+
+/* --- the well, once there is something in the list ---------------------
+ *
+ * The full-size well is 174px of invitation, and it kept all of it after
+ * the invitation had been accepted -- on the default window that was most
+ * of the reason the result pane fell off the bottom. With files in the
+ * list it collapses to the row that is still useful (Browse, Recent, the
+ * path box) plus a line saying it is still a drop target, which it is:
+ * dropping is handled on the whole window either way. */
+
+.kb-drop-hint { display: none; }
+
+.kb-drop-well.kb-compact {
+  padding: 7px 10px 8px;
+  text-align: left;
+}
+
+.kb-drop-well.kb-compact::before { inset: 3px; }
+
+.kb-drop-well.kb-compact .kb-drop-glyph,
+.kb-drop-well.kb-compact .kb-drop-title,
+.kb-drop-well.kb-compact .kb-drop-sub {
+  display: none;
+}
+
+.kb-drop-well.kb-compact .kb-drop-hint {
+  display: block;
+  color: #555;
+  font-size: 12px;
+  margin: 0 0 4px 2px;
+}
+
+.kb-drop-well.kb-compact .kb-drop-buttons {
+  justify-content: flex-start;
+  margin: 0;
+}
+
+/* --- the Recent menu ---------------------------------------------------- */
+
+/* The anchor the drop-down hangs from: the popup is absolute inside it, so
+ * it lands under the button whatever the row's flex layout decides. */
+.kb-recent-wrap {
+  position: relative;
+  display: inline-block;
+  flex: none;
+}
+
+.kb-menu {
+  position: absolute;
+  z-index: 90;
+  top: calc(100% + 2px);
+  left: 0;
+  min-width: 300px;
+  max-width: 520px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 2px;
+  text-align: left;
+  background: var(--button-face, #c0c0c0);
+  box-shadow: inset -1px -1px var(--window-frame, #0a0a0a),
+              inset 1px 1px var(--button-highlight, #fff),
+              inset -2px -2px var(--button-shadow, #808080),
+              inset 2px 2px var(--button-face, #c0c0c0),
+              3px 3px 0 rgba(0, 0, 0, 0.25);
+}
+
+.kb-menu-item {
+  padding: 3px 8px 4px;
+  cursor: default;
+  user-select: none;
+}
+
+.kb-menu-item:hover {
+  background: var(--dialog-blue);
+  color: #fff;
+}
+
+.kb-menu-name { display: block; }
+
+.kb-menu-where {
+  display: block;
+  font-size: 12px;
+  color: #555;
+}
+
+.kb-menu-item:hover .kb-menu-where { color: #dbe6f7; }
+
+.kb-menu-rule {
+  height: 0;
+  margin: 3px 2px;
+  border-top: 1px solid var(--button-shadow, #808080);
+  border-bottom: 1px solid var(--button-highlight, #fff);
+}
+
+/* --- inspect card and queue -------------------------------------------- */
+
+#inspect-card {
+  padding-top: 4px;
+  padding-bottom: 7px;
+}
+
+/* A long filename must not push the fieldset wider than the column. */
+#inspect-title {
+  display: inline-block;
+  max-width: 92%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.kb-inspect-row {
+  display: flex;
+  gap: 13px;
+  align-items: flex-start;
+}
+
+/* Held at the height of the tallest card there is -- a protected 1996
+ * data file, which carries a title, a folder, three facts, a format note
+ * and a companion line, and measures 124px -- so the queue below cannot
+ * jump under the cursor as you click between its rows.
+ *
+ * Reserved only when the queue holds more than one file, because that is
+ * the only time there is anything to click between: a single game gets a
+ * card its own size and gives the rest of the height back. */
+#inspect-card.kb-steady .kb-inspect-row { min-height: 124px; }
+
+/* The game's own icon, framed and given a little air rather than pressed
+ * into a 40px hole -- it is the one part of the card that is the game's
+ * and not KlikBack's. */
+.kb-inspect-icon {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px #a6a6a6,
+              0 1px 0 var(--button-highlight);
+}
+
+/* app.js sets the drawn size from the icon's own -- see sizeIcon(). These
+ * are the fallback for the moment before it loads. */
+.kb-inspect-icon img {
+  width: 32px;
+  height: 32px;
+  image-rendering: pixelated;
+}
+
+.kb-inspect-lines {
+  line-height: 1.3;
+  min-width: 0;
+}
+
+/* 600, not bold.
+ *
+ * Windows ships Segoe UI Semibold as its own drawn cut (seguisb), so 600
+ * is a real weight rather than a lighter setting of the bold one. At 13
+ * to 15px it separates a heading from its body text without the smear a
+ * 700 puts on small text. Every heading in the window uses it; `bold`
+ * survives only where 98.css is describing a 98 widget. */
+.kb-inspect-head {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.kb-inspect-title {
+  margin-top: 2px;
+  color: #333;
+}
+
+.kb-label { color: #6a6a6a; }
+
+/* The folder, not the file: the filename is already the card's legend. */
+.kb-inspect-where {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #6a6a6a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The three facts, in the same tag language as the queue's status chips
+ * so the window has one vocabulary for "a short labelled state". */
+.kb-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.kb-fact {
+  padding: 1px 8px 2px;
+  border-radius: 8px;
+  font-size: 12px;
+  white-space: nowrap;
+  background: #e3e3e3;
+  color: #3a3a3a;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.11);
+}
+
+.kb-fact-warn { background: #f4e6bd; color: #6b5200; }
+
+.kb-inspect-note {
+  margin-top: 5px;
+  font-size: 12px;
+  color: #555;
+}
+
+.kb-tick {
+  color: #2f7a2f;
+  font-weight: 600;
+  margin-right: 5px;
+}
+
+.kb-tick-none {
+  color: #8a8a8a;
+  font-weight: normal;
+}
+
+.kb-inspect-nope { color: #6a4a4a; }
+
+.kb-queue {
+  max-height: 132px;
+  overflow-y: auto;
+  background: #fff;
+}
+
+/* Fixed columns, and every cell one line.
+ *
+ * With the default auto layout a single filename too long for its column
+ * wrapped -- and that took EVERY row from 25px to 40px and shoved the
+ * panel to its 132px cap, a ~60px jump that moved everything below it.
+ * Fixed widths plus an ellipsis keep a row a row; the name that no longer
+ * fits is in the row's tooltip, in full. */
+.kb-queue-table { table-layout: fixed; }
+
+/* 215px is what "Multimedia Fusion 1.5 standalone" measures with its
+ * padding -- the string most rows carry, so the common case is never the
+ * one that elides. The long 1996 label still does, and is on the card
+ * above in full. */
+.kb-queue-table th:nth-child(2),
+.kb-queue-table td:nth-child(2) { width: 215px; }
+
+.kb-queue-table th:nth-child(3),
+.kb-queue-table td:nth-child(3) { width: 150px; }
+
+.kb-queue-table td {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kb-queue-table tbody tr { cursor: default; }
+
+/* A pale wash rather than the 98 solid-navy selection. The navy needed
+ * white text, which fought every coloured status chip in the row -- there
+ * was an outline rule here purely to keep the chips legible on top of it.
+ * A light selection needs no such rescue, and the accent edge says which
+ * row is current at a glance. */
+.kb-queue-table tbody tr.kb-selected {
+  /* Kept lighter than the blue "working" chip, which is the one chip that
+   * shares its hue and would otherwise vanish into the selected row. */
+  background: #e3edfb;
+  box-shadow: inset 3px 0 0 var(--dialog-blue-light);
+}
+
+.kb-queue-table td.kb-status-cell { white-space: nowrap; }
+
+/* The per-row remove control. A span, not a button, so 98.css's button
+ * chrome does not appear inside a table row; Delete on the selected row
+ * does the same job from the keyboard. */
+.kb-queue-table th.kb-remove-head,
+.kb-queue-table td.kb-remove-cell {
+  width: 20px;
+  padding-left: 0;
+  padding-right: 2px;
+  text-align: center;
+}
+
+.kb-remove {
+  display: inline-block;
+  width: 16px;
+  line-height: 15px;
+  text-align: center;
+  color: #7a7a7a;
+  cursor: default;
+  user-select: none;
+}
+
+.kb-remove:hover {
+  background: #a02020;
+  color: #fff;
+}
+
+/* --- options ------------------------------------------------------------ */
+
+.kb-option-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 16px;
+}
+
+.kb-out-row input { flex: 1 1 auto; }
+
+/* --- run row and result ------------------------------------------------- */
+
+.kb-run-row { margin-top: 2px; }
+
+/* --- the progress bar --------------------------------------------------
+ *
+ * The one control that is deliberately not a Windows 98 widget (user's
+ * call): a flat rounded track with a gradient fill and the percentage
+ * read out beside it rather than printed across it. The old bar drew the
+ * label twice -- a dark copy over the whole bar and a white copy clipped
+ * to the filled part, the white one's width scaled back up by
+ * 10000 / percent so the two lined up -- which was authentic and fragile
+ * (the scale factor runs away as the percentage nears zero). A label
+ * outside the bar needs none of that.
+ *
+ * What the look encodes: striped and marching means a run is going,
+ * solid means settled, a sliding comet means "started, nothing measurable
+ * yet". Motion is decoration in all three -- the fill's WIDTH never moves
+ * without a real event behind it, because a bar that creeps forward on a
+ * timer is a bar that lies. */
+
+.kb-progress {
+  flex: 1 1 auto;
+  position: relative;
+  height: 20px;
+  overflow: hidden;
+  border: 1px solid #8f8f8f;
+  border-radius: 3px;
+  background: #ececec;
+}
+
+.kb-progress-fill {
+  position: relative;
+  height: 100%;
+  width: 0;
+  border-radius: 2px 0 0 2px;
+  background: linear-gradient(180deg, #4aa3e8 0%, #1c74c4 55%, #12599e 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition: width 200ms linear;
+}
+
+/* The diagonal stripes exist only while a run is going, so a bar left at
+ * 100% after a finished run is calm rather than still busy. The pattern
+ * tiles at 20px, so shifting it by exactly that loops seamlessly. */
+.kb-progress.working:not(.marquee) .kb-progress-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(45deg,
+      rgba(255, 255, 255, 0.17) 25%, transparent 25%,
+      transparent 50%, rgba(255, 255, 255, 0.17) 50%,
+      rgba(255, 255, 255, 0.17) 75%, transparent 75%, transparent);
+  background-size: 20px 20px;
+  animation: kb-stripes 900ms linear infinite;
+}
+
+@keyframes kb-stripes {
+  from { background-position: 0 0; }
+  to   { background-position: 20px 0; }
+}
+
+/* Indeterminate: from the moment Decompile is pressed until the first
+ * real event. A chunk that fades out at both ends, sliding the length of
+ * the track, so it cannot be misread as a fill sitting at 34%.
+ *
+ * It is drawn by the TRACK, not by the fill, which is what keeps the
+ * handover clean: the fill stays at zero right through the indeterminate
+ * state, so when the first real event lands it grows out of zero instead
+ * of shrinking back from a third of the way along. Moving it by transform
+ * rather than by margin keeps the animation off the layout. */
+.kb-progress.marquee::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 34%;
+  background: linear-gradient(90deg,
+      rgba(28, 116, 196, 0) 0%, #3a95dd 35%,
+      #1c74c4 65%, rgba(28, 116, 196, 0) 100%);
+  animation: kb-marquee 1.15s linear infinite;
+}
+
+/* 34% wide, so its left edge travels from -34% to 100% of the track. */
+@keyframes kb-marquee {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(294%); }
+}
+
+/* The percentage, beside the bar. The column is wide enough for "100%" at
+ * all times and the digits are tabular, so neither the number nor the
+ * buttons after it shuffle sideways as it counts up. */
+.kb-progress-percent {
+  flex: 0 0 auto;
+  min-width: 3.4em;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #222;
+}
+
+/* Reduced motion: the stripes are pure decoration and go. The marquee
+ * slide stays -- it is the only thing saying "indeterminate", and a
+ * motionless chunk would read as a fill stuck at 34%. */
+@media (prefers-reduced-motion: reduce) {
+  .kb-progress.working:not(.marquee) .kb-progress-fill::after {
+    animation: none;
+  }
+}
+
+#go-button { font-weight: 600; }
+
+.kb-out-hint { margin: -2px 0 4px 2px; }
+
+/* The banner is the answer, so it carries the whole answer.
+ *
+ * "Wrote 518 KB across 2 files" used to sit two blocks below the banner
+ * with an empty advice line's margin in between, which made one statement
+ * read as two unrelated notes. It is the second line of the banner now,
+ * lighter than the headline: what happened, then how much. The accent
+ * edge gives the block a weight the flat pastel alone did not have. */
+.kb-banner {
+  padding: 7px 10px 8px;
+  border-left: 4px solid transparent;
+}
+
+.kb-banner-line { font-weight: 600; }
+
+.kb-banner.kb-good { background: #d4e8d4; border-left-color: #4c8a4c; }
+
+.kb-banner.kb-expected { background: #f4ecd0; border-left-color: #b89430; }
+
+.kb-banner.kb-bad { background: #f0d0d0; border-left-color: #a84a4a; }
+
+.kb-banner.kb-neutral {
+  background: var(--button-face);
+  border-left-color: var(--button-shadow);
+}
+
+/* Only takes space when it has something to say -- app.js hides it
+ * otherwise, rather than leaving an empty element holding its margins. */
+.kb-advice {
+  margin: 6px 0;
+  line-height: 1.45;
+}
+
+/* What actually landed on disk: the other half of "did that work". */
+.kb-written {
+  margin: 2px 0 0;
+  font-weight: normal;
+  color: #2c2c2c;
+}
+
+.kb-result-buttons { margin: 7px 0 6px; }
+
+/* Details and Full report are apparatus, not the answer: a quieter pair
+ * below a hairline, so the eye reaches them after the banner rather than
+ * alongside it. */
+.kb-result-more {
+  margin-top: 2px;
+  padding-top: 5px;
+  border-top: 1px solid var(--button-shadow);
+  box-shadow: inset 0 1px 0 var(--button-highlight);
+}
+
+.kb-result-more > details + details { margin-top: 3px; }
+
+.kb-result-more > details > summary {
+  color: #333;
+  font-size: 12px;
+}
+
+.kb-loss-list {
+  margin: 4px 0 2px;
+  padding-left: 20px;
+  line-height: 1.5;
+}
+
+/* What to do next, where somebody who opened Details went looking for it. */
+
+.kb-loss-note {
+  margin: 4px 0 2px;
+  line-height: 1.5;
+  color: #333;
+}
+
+/* Expected compile losses: visually calm, clearly labelled as normal. */
+
+#expected-losses {
+  margin: 6px 0 2px;
+  padding: 6px 8px;
+  background: #f2f2ee;
+  box-shadow: inset 1px 1px var(--button-shadow),
+              inset -1px -1px var(--button-highlight);
+}
+
+.kb-expected-note {
+  color: #444;
+  line-height: 1.5;
+  margin-bottom: 4px;
+}
+
+#expected-losses details { margin: 3px 0 0 2px; }
+
+#expected-losses summary { color: #333; }
+
+#expected-losses ul {
+  margin: 3px 0 4px;
+  padding-left: 22px;
+  line-height: 1.5;
+  color: #555;
+}
+
+.kb-log {
+  max-height: 190px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+/* Both status fields count in place -- "Frame 39 of 159" several times a
+ * second on the left, the elapsed clock on the right -- and proportional
+ * digits are different widths, so the text shuffles sideways as it
+ * climbs. Tabular figures are the same width by design. */
+/* Tabular figures because both fields count in place -- "Frame 39 of 159"
+ * several times a second, and the elapsed clock -- and proportional digits
+ * are different widths, so the line shuffles sideways as it climbs.
+ *
+ * One line, always. A field that wraps grows the bar, and the bar is
+ * pinned OUTSIDE the scrolling middle, so a long filename or a saved path
+ * would steal height from the content at exactly the moment a run is
+ * reporting on it. Measured before this rule: 24 -> 42px, which is a
+ * second line taken off the queue. The same treatment the queue's own rows
+ * already have, for the same reason. */
+.kb-status .status-bar-field {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Fixed, not merely a minimum. The widest thing this field ever holds is a
+ * long batch position beside an hour-long clock, which measures 146px in
+ * this face, so 160 covers it with the field's padding and it never has to
+ * resize. It used to grow past its 140px minimum on that content and take
+ * the width out of the field beside it -- and with the message now elided
+ * rather than wrapped, a left field that changes width as the clock ticks
+ * would re-cut the sentence once a second. */
+.kb-status-right {
+  flex: 0 0 160px;
+  text-align: right;
+}
+
+/* --- the recovery-options group ----------------------------------------- */
+
+.kb-advanced {
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px solid var(--button-shadow);
+}
+
+.kb-advanced > summary {
+  font-weight: 600;
+  padding: 2px 0;
+}
+
+.kb-advanced[open] > summary {
+  margin-bottom: 2px;
+}
+
+/* --- the installed-extensions section ----------------------------------- */
+
+.kb-ext-note {
+  color: #444;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 2px 2px 6px;
+  max-width: 640px;
+}
+
+/* --- tooltips (the classic pale-yellow kind) ---------------------------- */
+
+#kb-tooltip {
+  position: fixed;
+  z-index: 100;
+  max-width: 340px;
+  /* A tip may be several lines -- a queue row leads with the full path
+   * and follows it with what the row can do. */
+  white-space: pre-line;
+  background: #ffffe1;
+  color: #000;
+  border: 1px solid #000;
+  padding: 6px 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+
+/* --- queue status chips ------------------------------------------------- */
+
+/* The faint edge is what keeps a chip a chip on any background it lands
+ * on -- a selected row, a striped one, or the plain white of the list. */
+.kb-chip {
+  display: inline-block;
+  padding: 1px 8px 2px;
+  border-radius: 8px;
+  white-space: nowrap;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.11);
+}
+
+.kb-chip-good    { background: #d4e8d4; color: #1d5c1d; }
+.kb-chip-warn    { background: #f4e6bd; color: #6b5200; }
+.kb-chip-bad     { background: #f0d0d0; color: #7a1010; }
+.kb-chip-run     { background: #d5e3f7; color: #0f3f7a; }
+.kb-chip-neutral { background: #e4e4e4; color: #444; }
+
+
+/* --- result banner icon ------------------------------------------------- */
+
+.kb-banner-icon {
+  display: inline-block;
+  margin-right: 7px;
+}
