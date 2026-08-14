@@ -8,6 +8,8 @@ game back into an editable project.**
 
 If you have an old Clickteam-era game and no longer have the source that built it, KlikBack rebuilds it and recovers the source. Point it at the game's `.exe`, `.gam`, `.cca` or `.ccn` and it writes a project file the original editor opens, carrying the frames, objects, events, artwork, sounds and extension modules that were inside the game.
 
+### [Download the latest release](https://github.com/just-addwater/KlikBack/releases/latest)
+
 > [!CAUTION]
 > **KlikBack is a preservation tool. Use it on games you made, own the
 > copyright to, or have the rights holder's permission to work on.
