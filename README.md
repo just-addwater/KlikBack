@@ -6,7 +6,7 @@
 **Turn a compiled Multimedia Fusion 1.0/1.5, The Games Factory, Multimedia Fusion Express or Click & Create
 game back into an editable project.**
 
-If you have an old Clickteam-era game and no longer have the source that built it, KlikBack rebuilds it and recovers the source. Point it at the game's `.exe`, `.gam`, `.cca` or `.ccn` and it writes a project file the original editor opens, carrying the frames, objects, events, artwork, sounds and extension modules that were inside the game.
+If you have an old Clickteam made game and no longer have the source that built it, KlikBack rebuilds it and recovers the source. Point it at the game's `.exe`, `.gam`, `.cca` or `.ccn` and it writes a project file the original editor opens, carrying the frames, objects, events, artwork, sounds and extension modules that were inside the game.
 
 ### [Download the latest release](https://github.com/just-addwater/KlikBack/releases/latest)
 
@@ -32,7 +32,8 @@ It runs offline on Windows, needs no copy of Multimedia Fusion installed, and ne
 | ✅ | An **incomplete** copy, a download that stopped early | TGF, CnC, Express | option for an attempted rebuilt without the assets whose bytes are missing |
 | ❌ | Multimedia Fusion **2** and Clickteam Fusion **2.5** or later | | **not** supported |
 
-*MMF Express is a rebranded Click & Create.*
+**Newer Clickteam software is backward-compatible with projects created in earlier Clickteam products. A game created in The Games Factory can be opened in later versions of Clickteam software like MMF 1, 2 or later.**
+**MMF Express is a rebranded Click & Create.*
 
 
 Files are identified by **content, never by extension**: the signatures in the file decide what it is, so a renamed or mislabelled game still reads correctly, and something that only looks like a game is told apart from one that is. The generation comes from the game's own package header, not from the version stamp an author can overwrite.
