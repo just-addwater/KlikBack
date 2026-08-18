@@ -33,10 +33,8 @@ It runs offline on Windows, needs no copy of Multimedia Fusion installed, and ne
 | ❌ | Multimedia Fusion **2** and Clickteam Fusion **2.5** or later | | **not** supported |
 
 **Newer Clickteam software is backward-compatible with projects created in earlier Clickteam products. A game created in The Games Factory can be opened in later versions of Clickteam software like MMF 1, 2 or later.**
+
 **MMF Express is a rebranded Click & Create.*
-
-
-Files are identified by **content, never by extension**: the signatures in the file decide what it is, so a renamed or mislabelled game still reads correctly, and something that only looks like a game is told apart from one that is. The generation comes from the game's own package header, not from the version stamp an author can overwrite.
 
 Multimedia Fusion 2 and later pack a game a different way so KlikBack cannot read it. If you need to decompile them, try https://github.com/AITYunivers/NebulaFD. 
 
@@ -80,24 +78,10 @@ lands in `build/dist/`.
 |---|---|
 | Comment text | the compiler keeps the comment rows and their positions, and throws the words away |
 | Editor-only pictures | object icons and frame preview thumbnails are not stored in a compiled game |
-| Global event page names | the events all survive and run as before; only the name of the page they were filed under is gone, so each one lands in its frame behind a clear label |
+| Global event/Behaviour page names | the events all survive and run as before; only the name of the page they were filed under is gone, so each one lands in its frame behind a clear label |
 | Global value names | the runtime keeps the values and never the names, so they come back as `Global Value A`, `B`, `C` |
 
 *TGF/CnC V 1.00 exports seems to keep comment text*
-
-That list is the same for every compiled game, whatever reads it. What KlikBack adds is telling you which of it applied to yours:
-
-- **Losses are itemised, not summarised.** Every line beginning `loss:` in
-  the session log is content the writer knew it dropped, named with the
-  frame, object or row it belongs to. A game with losses is normal; the
-  list tells you which ones matter for what you want to do.
-- **A refusal is an honest outcome, not a crash.** Where a game uses
-  something that cannot be reconstructed correctly, KlikBack names the
-  feature and stops, instead of writing a project that opens and is quietly
-  wrong.
-- **Nothing is overwritten.** Neither the game nor an existing project file
-  is ever written over unless you ask for it explicitly.
-
 
 ## Layout
 
