@@ -38,11 +38,15 @@ It runs offline on Windows, needs no copy of Multimedia Fusion installed, and ne
 
 Multimedia Fusion 2 and later pack a game a different way so KlikBack cannot read it. If you need to decompile them, try https://github.com/AITYunivers/NebulaFD. 
 
-Extension modules (`.cox` / `.gox`) are carved out of the game itself, so a game that needs an extension your machine has never had still comes back with that extension beside it.
+Extension modules (`.cox` / `.gox`) are carved out of the game itself, so a game that needs an extension your machine has never had still comes back with that extension beside it. Note that these extensions might be runtime versions, not editor ones. For any missing editor versions check: 
+
+- CnC/TGF [Encyclofusion](https://encyclofusion.github.io/GET/) 
+- MMF 1.0/1.5 [MMF Extension Archive](https://just-addwater.github.io/MMF-Extension-Archive/)
+- MMF 2.0 [Darkwire](https://dark-wire.com/storage/extlist.php)
 
 ## Running it
 
-Most people want the packaged app, a plain folder with no installer: download the zip, unzip, run `KlikBack.exe`. Its own `README.txt` covers the app and the options.
+Most people want the packaged app, a plain folder with no installer: [download the zip](https://github.com/just-addwater/KlikBack/releases/latest), unzip, run `KlikBack.exe`. Its own `README.txt` covers the app and the options.
 
 | Version | SHA-256 |
 |---|---|
@@ -110,15 +114,22 @@ core/ is generated and re-generated in place, so hand edits are overwritten.
 
 Some object types ship with no icon of their own. KlikBack draws every icon it can from the game's own art, and falls back to the drawings in `core/artwork/`, which are this project's own work. In the packaged app that folder is visible beside the exe: replace a PNG and the substitutes change.
 
-Five of the nine names ship (`other.png`, `string.png`, `counter.png`, `lives.png`, `score.png`); the other four are empty drop-in slots, filled only by somebody who wants them. Each drawing is a 32x32 PNG, 8 bits per channel, full colour or 256-colour palette, not interlaced, with transparency as an alpha channel or bright green. `resources.py` holds every name either icon family knows to that contract at startup, before a game is opened, because the alternative is a decompile stopping partway through over a file the person editing it never saw named.
+### Research Credits
 
+| Name | Link |
+|---|---|
+| Valley Bell | [Link](https://forums.sonicretro.org/members/valleybell.10380/) |
+| CTFAK2.0 | [Github](https://github.com/CTFAK/CTFAK2.0) |
+| Anaconda | [Github](https://github.com/fnmwolf/Anaconda) |
+| SourceExplorer | [Github](https://github.com/LAK132/SourceExplorer) |
 
 ## Licence, and what it does not cover
 
 KlikBack is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the Licence, or (at your option) any later version.
 
-KlikBack is distributed in the hope that it will be useful, but **without any warranty**, without even the implied warranty of merchantability or fitness for a particular purpose. See the GNU General Public License for more details. The full text is in [LICENSE](LICENSE).
+KlikBack is distributed in the hope that it will be useful, but **without any warranty**, without even the implied warranty of merchantability or fitness for a particular purpose. See the GNU General Public License for more details. The full text is in [LICENSE](LICENSE). 
 
+Prebuilt Windows packages include third-party runtime components. Their copyright notices and license terms are provided in THIRD-PARTY-NOTICES.txt and the accompanying licenses/ directory. These components remain the property of their respective authors and are distributed under their own licenses.
 
 **KlikBack claims no rights in its output. The GPL applies only to
 KlikBack.** Decompilation does not grant rights in the original game, its assets, or extracted extension modules; use and redistribute them only when authorised.
