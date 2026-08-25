@@ -15,6 +15,7 @@ from __future__ import annotations
 import struct
 from dataclasses import dataclass
 from pathlib import Path
+from klikback.core.common.compression_probe import application_bytes, overlay_offset
 
 EMBEDDED_MODULE_CHUNK = 0x222C
 
@@ -38,9 +39,10 @@ def _walks_to_terminator(data: bytes, start: int, terminator: int) -> bool:
 
 def find_module_stream(data: bytes) -> int:
     """Locate one module image inside the game."""
-    overlay = data.find(b"PAME", 0x40000)
+    overlay = overlay_offset(data)
     if overlay < 0:
         raise ValueError("no MMF PAME overlay")
+
     terminator = overlay - 8
     if terminator < 0:
         return -1
@@ -57,12 +59,13 @@ def find_module_stream(data: bytes) -> int:
     return -1
 
 def embedded_modules(path: Path) -> list[EmbeddedModule]:
+
     """Every module image the game carries."""
-    data = path.read_bytes()
+    data = application_bytes(path.read_bytes())
     start = find_module_stream(data)
     if start < 0:
         return []
-    overlay = data.find(b"PAME", 0x40000)
+    overlay = overlay_offset(data)
     modules: list[EmbeddedModule] = []
     pos = start
     while pos < overlay:

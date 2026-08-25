@@ -216,6 +216,7 @@ def frame_item_record(
     if (
         len(obj["definition"]) > SCROLL_FLAGS_OFFSET
         and b"\x04\x00DFlg" in record
+        and runtime_populates_display_and_ink_flags(obj["object_type"])
     ):
         display_flag = bool(obj["definition"][SCROLL_FLAGS_OFFSET] & DISPLAY_PROPERTY_BIT)
         if display_flag:
@@ -231,20 +232,32 @@ def frame_item_record(
             record = set_property_entry(record, b"InkF", INK_EFFECT_ENTRY, effect)
             record = set_property_entry(record, b"InkF", INK_AMOUNT_ENTRY, amount)
 
-            if obj["object_type"] != QANDA_OBJECT_TYPE:
+            transparency_is_carried = (
+                obj["object_type"] != QANDA_OBJECT_TYPE
+                and runtime_populates_display_and_ink_flags(obj["object_type"])
+            )
+            if transparency_is_carried:
                 record = set_property_entry(
                     record,
                     b"InkF",
                     INK_TRANSPARENT_ENTRY,
                     CHECKBOX_ON if flags & INK_TRANSPARENT_BIT else CHECKBOX_OFF,
                 )
-        if b"\x04\x00AntA" in record:
+
+        if b"\x04\x00AntA" in record and runtime_populates_display_and_ink_flags(
+            obj["object_type"]
+        ):
             record = set_u32_property(
                 record,
                 b"AntA",
                 CHECKBOX_ON if flags & INK_ANTIALIAS_BIT else CHECKBOX_OFF,
             )
     return record
+
+EXTENSION_OBJECT_FLOOR = 32
+
+def runtime_populates_display_and_ink_flags(object_type: int) -> bool:
+    return object_type < EXTENSION_OBJECT_FLOOR
 
 DISPLAY_PROPERTY_BIT = 0x10
 

@@ -38,6 +38,7 @@ import traceback
 from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
+from klikback.core.common.compression_probe import application_bytes, overlay_offset
 from klikback.core.common.extension_binaries import embedded_modules
 from klikback.core.mmf1.editor_state import retarget_frame_editor_windows
 from klikback.core.common.mixed_multiframe_blind_reconstruct import failed_output_path, reconstruct, reconstruction_report, set_project_path, summary_output_path, validate, write_report
@@ -45,6 +46,8 @@ from klikback.core.common.mixed_multiframe_blind_reconstruct import failed_outpu
 DEFAULT_EXTENSIONS: list[Path] = []
 
 SKIP_PARTS: tuple[str, ...] = ()
+
+BUILD_SUFFIXES = (".exe", ".scr", ".ccn")
 
 def executables(roots: list[Path]) -> list[Path]:
     """Walk a path into the list of candidate files, recursing into folders."""
@@ -56,11 +59,18 @@ def executables(roots: list[Path]) -> list[Path]:
         if not root.exists():
             print(f"  SKIP {root}: does not exist")
             continue
-        for path in sorted(root.rglob("*.exe")):
+        for path in sorted(root.rglob("*")):
+            if path.suffix.lower() not in BUILD_SUFFIXES or not path.is_file():
+                continue
             if any(part.startswith(SKIP_PARTS) for part in path.parts):
                 continue
             found.append(path)
     return found
+
+def output_label(build: Path) -> str:
+    if build.suffix.lower() == ".exe":
+        return build.stem
+    return f"{build.stem}{build.suffix.lower().replace('.', '_')}"
 
 def is_mmf_standalone(exe: Path) -> bool:
     """Whether these bytes are a 1.0 standalone game, judged by content alone.
@@ -69,10 +79,10 @@ def is_mmf_standalone(exe: Path) -> bool:
     runtime appends is the evidence.
     """
     try:
-        data = exe.read_bytes()
+        data = application_bytes(exe.read_bytes())
     except OSError:
         return False
-    return data.startswith(b"PAME") or data.find(b"PAME", 0x40000) >= 0
+    return overlay_offset(data) >= 0
 
 def extract_cox(exe: Path, out_dir: Path, force: bool) -> str:
     """Carve the extension modules the game carried into a folder of `.cox` files.
@@ -373,7 +383,8 @@ def main() -> None:
 
     targets = executables(args.targets)
     if not targets:
-        raise SystemExit("no .exe files found")
+
+        raise SystemExit(f"no {'/'.join(BUILD_SUFFIXES)} files found")
 
     outcomes: Counter[str] = Counter()
     for exe in targets:
@@ -383,16 +394,17 @@ def main() -> None:
             outcomes["not an MMF standalone"] += 1
             print("  skipped: no PAME overlay -- not an MMF standalone")
             continue
+        label = output_label(exe)
         if not args.no_cox:
-            print("  " + extract_cox(exe, out_dir / f"{exe.stem}_cox", args.force))
+            print("  " + extract_cox(exe, out_dir / f"{label}_cox", args.force))
         if not args.no_cca:
-            target = out_dir / f"{exe.stem}{args.suffix}.cca"
+            target = out_dir / f"{label}{args.suffix}.cca"
             outcome, report = build_cca(exe, target, args)
             outcomes[outcome] += 1
             print("  " + report)
 
     if not args.no_cca:
         tally = ", ".join(f"{n} {k}" for k, n in sorted(outcomes.items()))
-        print(f"\n{len(targets)} EXEs seen: {tally}")
+        print(f"\n{len(targets)} builds seen: {tally}")
         print("A 'loss:' line is content the writer knew it dropped -- read them.")
         print("Opening in MMF proves it loads; run/edit/save/close/reopen is the real test.")

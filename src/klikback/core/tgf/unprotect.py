@@ -531,6 +531,8 @@ def unprotect(game: tgf.GameFile, *, substitute: bool = True,
               generate_icons: bool = True,
               repair_bank: bool = False,
 
+              repair_object_data: bool = False,
+
               repack_placement: set[int] | None = None,
 
               progress: Callable[..., None] | None = None,
@@ -662,7 +664,94 @@ def unprotect(game: tgf.GameFile, *, substitute: bool = True,
             f"{object_pointer_fixes} object first-data-block pointer(s), which a "
             f"protected file leaves naming the unprotected layout",
         )
+    if repair_object_data:
+        _repair_active_heads(out, level_addresses, report)
     return bytes(out), report
+
+ACTIVE_VALUE_NAMES_AT = 0x24
+
+ACTIVE_HEAD_CONSTANT_AT = 0x28
+
+ACTIVE_HEAD_CONSTANT = 0x00FB
+
+def _active_animation_end(data: bytes) -> int | None:
+    if len(data) < 0x30 or data[0x2A:0x2E] != b"SPRI":
+        return None
+    sprite = 0x2E
+    (sprite_len,) = struct.unpack_from("<H", data, sprite)
+    ani = sprite + sprite_len
+    if ani + 0x24 > len(data):
+        return None
+    end = ani + 4 + 32
+    for slot in range(16):
+        (aptr,) = struct.unpack_from("<H", data, ani + 4 + 2 * slot)
+        if aptr >= 0x8000:
+            continue
+        adata = ani + aptr
+        if adata + 0x40 > len(data):
+            return None
+        end = max(end, adata + 0x40)
+        for direction in range(32):
+            (dptr,) = struct.unpack_from("<H", data, adata + 2 * direction)
+            if dptr >= 0x8000:
+                continue
+            ddata = adata + dptr
+            if ddata + 0x0A > len(data):
+                return None
+            (frames,) = struct.unpack_from("<H", data, ddata + 6)
+            end = max(end, ddata + 8 + 2 * frames)
+    return end
+
+def _repair_active_heads(out: bytearray, level_addresses: list[int],
+                         report: Report) -> int:
+    repaired = 0
+    for level_index, level_data in enumerate(level_addresses):
+        level_start = level_data - 6
+        length = struct.unpack_from("<I", out, level_start + 2)[0]
+        level = bytes(out[level_data:level_data + length])
+        _, blocks = tgf.level_blocks(level)
+        for block in blocks:
+            if block.ident != 0x02:
+                continue
+            block_base = level_data + block.offset + 6
+            for obj in tgf.object_definitions(block.data):
+                if obj.object_type != 0x02:
+                    continue
+                for db in obj.blocks:
+                    if db.ident != 0x00 or len(db.data) < 0x2E:
+                        continue
+                    data = db.data
+                    (pos,) = struct.unpack_from(
+                        "<I", data, ACTIVE_VALUE_NAMES_AT)
+                    (constant,) = struct.unpack_from(
+                        "<H", data, ACTIVE_HEAD_CONSTANT_AT)
+                    if (not any(data[0x21:0x24])
+                            and constant == ACTIVE_HEAD_CONSTANT
+                            and 0 < pos <= len(data)):
+                        continue
+                    end = _active_animation_end(data)
+                    if end is None or not 0 < end + 2 <= len(data):
+                        report.line(
+                            report.losses,
+                            f"level {level_index}: active {obj.index} "
+                            f"({obj.name!r}) violates the data-head "
+                            f"invariants and its animation region does not "
+                            f"walk, so it was left as shipped")
+                        continue
+                    at = block_base + db.offset + 6
+                    out[at + 0x21:at + 0x24] = b"\0\0\0"
+                    struct.pack_into("<I", out, at + ACTIVE_VALUE_NAMES_AT,
+                                     end + 2)
+                    struct.pack_into("<H", out, at + ACTIVE_HEAD_CONSTANT_AT,
+                                     ACTIVE_HEAD_CONSTANT)
+                    repaired += 1
+                    report.line(
+                        report.substituted,
+                        f"level {level_index}: active {obj.index} "
+                        f"({obj.name!r}) data-head repaired -- value-names "
+                        f"position rederived as {end + 2}, the 0x00FB "
+                        f"constant restored, +0x21..+0x23 zeroed")
+    return repaired
 
 def _repoint(out: bytearray, block_base: int, block: bytes,
              globals_have_blocks: bool = False) -> int:
@@ -783,6 +872,19 @@ def main() -> int:
              "everywhere else the bank is copied byte-for-byte, and this is "
              "the one flag that changes that",
     )
+    parser.add_argument(
+        "--repair-object-data",
+        action="store_true",
+        help="restore an active object's data-block head where the file as "
+             "shipped violates the three invariants every authored active "
+             "satisfies (58,597 of 58,597 measured): value-names position "
+             "in range and equal to the animation region's end + 2, the "
+             "0x00FB constant at +0x28, zeros at +0x21..+0x23. MMF 1.5 "
+             "refuses a whole game over one such head while the 1996 "
+             "editors open it. The position is REDERIVED from the block's "
+             "own animation structure, not substituted. OFF by default: "
+             "this program otherwise copies object data verbatim, and a "
+             "healthy file comes back byte for byte")
     parser.add_argument(
         "--repack-placement", nargs="?", const="all", metavar="LEVELS",
         help="reorder a level's object-placement pointers so they address "
@@ -943,6 +1045,7 @@ def main() -> int:
                              drop_comment_rows=drop_rows,
                              generate_icons=not args.no_generate_icons,
                              repair_bank=args.repair_bank,
+                             repair_object_data=args.repair_object_data,
                              repack_placement=repack)
     print(report.render())
     print(f"  {len(game.raw):,} bytes in, {len(data):,} bytes out")

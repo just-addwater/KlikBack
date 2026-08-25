@@ -35,6 +35,7 @@ from collections import Counter
 from collections.abc import Callable
 import traceback
 from pathlib import Path
+from klikback.core.common.compression_probe import application_bytes, overlay_offset
 from klikback.core.common.extension_binaries import embedded_modules
 from klikback.core.mmf15.assemble import ContainerProblem, SUBAPPLICATION_TYPE, Unsupported, assemble, subapplication_payload
 from klikback.core.mmf15.object_record import runtime_objects
@@ -46,6 +47,8 @@ DEFAULT_EXTENSIONS: list[Path] = []
 
 SKIP_PARTS: tuple[str, ...] = ()
 
+BUILD_SUFFIXES = (".exe", ".scr", ".ccn")
+
 def executables(roots: list[Path]) -> list[Path]:
     """Walk a path into the list of candidate files, recursing into folders."""
     found: list[Path] = []
@@ -56,20 +59,27 @@ def executables(roots: list[Path]) -> list[Path]:
         if not root.exists():
             print(f"  SKIP {root}: does not exist")
             continue
-        for path in sorted(root.rglob("*.exe")):
+        for path in sorted(root.rglob("*")):
+            if path.suffix.lower() not in BUILD_SUFFIXES or not path.is_file():
+                continue
             if any(part.startswith(SKIP_PARTS) for part in path.parts):
                 continue
             found.append(path)
     return found
 
+def output_label(build: Path) -> str:
+    if build.suffix.lower() == ".exe":
+        return build.stem
+    return f"{build.stem}{build.suffix.lower().replace('.', '_')}"
+
 def is_mmf_standalone(exe: Path) -> bool:
     """Whether these bytes are a 1.5 standalone game, judged by content alone.
     """
     try:
-        data = exe.read_bytes()
+        data = application_bytes(exe.read_bytes())
     except OSError:
         return False
-    return data.startswith(b"PAME") or data.find(b"PAME", 0x40000) >= 0
+    return overlay_offset(data) >= 0
 
 def extract_cox(exe: Path, out_dir: Path, force: bool) -> str:
     """Carve the extension modules the game carried into a folder of `.cox` files.
@@ -392,12 +402,13 @@ def main() -> None:
             outcomes["not an MMF standalone"] += 1
             print("  skipped: no PAME overlay -- not an MMF standalone")
             continue
+        label = output_label(exe)
         if not args.no_cox:
-            print("  " + extract_cox(exe, out_dir / f"{exe.stem}_cox", args.force))
+            print("  " + extract_cox(exe, out_dir / f"{label}_cox", args.force))
             print("  " + module_drift(exe, args.extensions))
         if not args.no_cca:
             children = [] if args.no_subapps else external_subapplications(exe)
-            target = out_dir / f"{exe.stem}{args.suffix}.cca"
+            target = out_dir / f"{label}{args.suffix}.cca"
             outcome, report = build_cca(
                 exe, target, args, donors,
                 subapplication_directory=out_dir if children else None,

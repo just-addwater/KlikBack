@@ -832,14 +832,24 @@ def decompress_clickteam_record_salvaged(
     faults[0]["stored_length"] = fault["stored_length"]
     return output, stored_size, faults
 
+def overlay_offset(data: bytes) -> int:
+    if data.startswith(b"PAME"):
+        return 0
+    return data.find(b"PAME", 0x40000)
+
+def application_bytes(data: bytes) -> bytes:
+    if overlay_offset(data) >= 0:
+        return data
+    try:
+        from klikback.core.common.project_pack import packed_application
+    except ImportError:
+        return data
+    return packed_application(data) or data
+
 def load_exe_frame(path: Path) -> tuple[list[Chunk], list[Chunk]]:
     """Pull one frame's compressed chunk out of a compiled game."""
-    data = path.read_bytes()
-
-    if data.startswith(b"PAME"):
-        overlay = 0
-    else:
-        overlay = data.find(b"PAME", 0x40000)
+    data = application_bytes(path.read_bytes())
+    overlay = overlay_offset(data)
     if overlay < 0:
         raise ValueError(f"{path}: no MMF PAME overlay")
     outer = read_chunks(data, overlay + 0x10, len(data))

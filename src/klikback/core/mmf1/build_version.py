@@ -106,7 +106,9 @@ def code_fingerprint(data: bytes) -> str | None:
 def build_stamp(path: Path) -> BuildStamp | None:
     """The build this executable was produced by, as far as its resources admit.
     """
-    data = path.read_bytes()
+    return build_stamp_in(path.read_bytes())
+
+def build_stamp_in(data: bytes) -> BuildStamp | None:
     at = data.find(FIXED_FILE_INFO_SIGNATURE)
     code = code_fingerprint(data)
     if at < 0:

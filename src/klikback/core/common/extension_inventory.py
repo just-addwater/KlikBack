@@ -14,17 +14,14 @@ from __future__ import annotations
 import struct
 from pathlib import Path
 from klikback.core.common.compare import Chunk, read_chunks
+from klikback.core.common.compression_probe import application_bytes, overlay_offset
 from klikback.core.common.exe_to_cca import decompress_chunk
 from klikback.core.common.object_analysis import split_object_chunks
 
 def load_outer(path: Path) -> list[Chunk]:
     """Open a compiled game's outer package."""
-    data = path.read_bytes()
-
-    if data.startswith(b"PAME"):
-        overlay = 0
-    else:
-        overlay = data.find(b"PAME", 0x40000)
+    data = application_bytes(path.read_bytes())
+    overlay = overlay_offset(data)
     if overlay < 0:
         raise ValueError(f"{path}: no MMF PAME overlay")
     return read_chunks(data, overlay + 0x10, len(data))
@@ -35,8 +32,8 @@ PACKAGE_VERSION_MMF15 = 0x0301
 
 def package_version(path: Path) -> int | None:
     """Which version of the package format this file is."""
-    data = path.read_bytes()
-    overlay = 0 if data.startswith(b"PAME") else data.find(b"PAME", 0x40000)
+    data = application_bytes(path.read_bytes())
+    overlay = overlay_offset(data)
     if overlay < 0:
         return None
     return struct.unpack_from("<H", data, overlay + 4)[0]

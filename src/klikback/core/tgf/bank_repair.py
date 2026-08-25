@@ -56,6 +56,29 @@ def sum_driven_ok(rec: img.ImageRecord) -> tuple[bool, str]:
         return False, f"colours {len(colours)} short of {opaque_total * bpp}"
     return True, ""
 
+RLE_OVERRUN_TOLERANCE = 3
+
+def rle_overrun(rec: img.ImageRecord) -> int:
+    if not rec.flags & img.FLAG_TGF_COMPRESSION or not rec.flags & img.FLAG_RLE:
+        return 0
+    bpp = img.BYTES_PER_PIXEL.get(rec.mode)
+    if bpp is None:
+        return 0
+    p, h = rec.payload, rec.height
+    if len(p) < 4 + 8 * h or h == 0:
+        return 0
+    (declared,) = struct.unpack_from("<I", p, 0)
+    pointers = [struct.unpack_from("<II", p, 4 + 8 * i) for i in range(h)]
+    colour_base = min(c for _o, c in pointers)
+    expected = declared - 4 - 8 * h - (colour_base - 8 * h)
+    if expected < 0:
+        return 0
+    try:
+        decoded, _ = img.rle_decode(p[4 + colour_base:], bpp)
+    except img.ImageProblem:
+        return 0
+    return max(0, len(decoded) - expected)
+
 def decode_lenient(rec: img.ImageRecord) -> list[list[int | None]]:
     """Decode a record the tolerant way the 1996 editors do."""
     bpp = img.BYTES_PER_PIXEL[rec.mode]
@@ -117,6 +140,10 @@ def repair_record(raw: bytes) -> tuple[bytes, str]:
     ok, why = sum_driven_ok(made)
     if not ok:
         raise img.ImageProblem(f"repair failed its own gate: {why}")
+    if rle_overrun(made):
+        raise img.ImageProblem(
+            "repair failed its own gate: the re-encoded stream still "
+            "overruns its declared buffer")
     return out, how
 
 def repair_bank(segment_data: bytes) -> tuple[bytes, list[str]]:
@@ -131,9 +158,14 @@ def repair_bank(segment_data: bytes) -> tuple[bytes, list[str]]:
         except img.ImageProblem:
             continue
         ok, why = sum_driven_ok(rec)
-        if ok:
+        overrun = rle_overrun(rec)
+        if ok and overrun <= RLE_OVERRUN_TOLERANCE:
             continue
         repaired, how = repair_record(segment_data[off:off + size])
+        if ok:
+            how += (f"; the colour stream decoded {overrun} bytes past its "
+                    f"declared buffer, against a measured ceiling of "
+                    f"{RLE_OVERRUN_TOLERANCE}")
         repairs[slot] = (repaired, how)
     if not repairs:
         return segment_data, []

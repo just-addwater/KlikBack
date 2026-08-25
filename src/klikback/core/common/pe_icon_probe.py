@@ -46,7 +46,11 @@ def pe_resources(path: Path) -> list[Resource]:
     rebuild puts back into the project, and the version stamp that helps identify
     which build made the game.
     """
-    data = path.read_bytes()
+    from klikback.core.common.compression_probe import application_bytes
+
+    return pe_resources_in(application_bytes(path.read_bytes()), str(path))
+
+def pe_resources_in(data: bytes, path: str = "<bytes>") -> list[Resource]:
     pe_pos = struct.unpack_from("<I", data, 0x3C)[0]
     if data[pe_pos : pe_pos + 4] != b"PE\0\0":
         raise ValueError(f"{path}: not a PE executable")
