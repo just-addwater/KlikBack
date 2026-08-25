@@ -3,7 +3,7 @@
 
 # KlikBack: a decompiler for MMF, TGF, CnC Clickteam games
 
-**Turn a compiled Multimedia Fusion 1.0/1.5, The Games Factory, Multimedia Fusion Express or Click & Create
+**Turn a compiled Multimedia Fusion 1.0/1.5/2.0, The Games Factory, Multimedia Fusion Express or Click & Create
 game back into an editable project.**
 
 If you have an old Clickteam made game and no longer have the source that built it, KlikBack rebuilds it and recovers the source. Point it at the game's `.exe`, `.gam`, `.cca` or `.ccn` and it writes a project file the original editor opens, carrying the frames, objects, events, artwork, sounds and extension modules that were inside the game.
@@ -24,21 +24,21 @@ It runs offline on Windows, needs no copy of Multimedia Fusion installed, and ne
 |  | Input | Versions | What you get |
 |:--:|---|---|---|
 | ✅ | Multimedia Fusion **1.0 / 1.1 / 1.2** standalone (`.exe`) | Builds 87 to 98 | an editable `.cca`, written as build 98 |
-| ✅ | Multimedia Fusion **1.5** standalone (`.exe`) or package (`.ccn`) | Builds 105 to 119 | an editable `.cca`, written as build 119 |
+| ✅ | Multimedia Fusion **1.5** standalone (`.exe`) or (`.ccn`) | Builds 105 to 119 | an editable `.cca`, written as build 119 |
+| ✅ | Multimedia Fusion **2.0** standalone (`.exe`)  | Builds 239 to 257 | an editable `.mfa`, written as build 250. HWA builds supported |
 | ✅ | **The Games Factory** standalone | 1.00 to 1.06 | an editable `.gam`, unprotected |
 | ✅ | **Click & Create** or **MMF Express** standalone | CnC 1.0 to 1.03, Express 1.04 to 1.06 | an editable `.cca`, unprotected |
-| ✅ | A **Vitalize** `.ccn` | Fusion 1.0 or 1.5 | an editable `.cca` |
+| ✅ | A **Vitalize** `.ccn` | Fusion 1.0/1.5/2.0 | an editable `.cca` or `.mfa`|
 | ✅ | A **protected** `.gam` / `.cca` | TGF, CnC, Express | the same file with the protection undone |
 | ✅ | An **incomplete** copy, a download that stopped early | TGF, CnC, Express | option for an attempted rebuilt without the assets whose bytes are missing |
-| ❌ | Multimedia Fusion **2** and Clickteam Fusion **2.5** or later | | **not** supported |
+| ❌ | Clickteam Fusion **2.5** or later | | **not** supported |
 
 **Newer Clickteam software is backward-compatible with projects created in earlier Clickteam products. A game created in The Games Factory can be opened in later versions of Clickteam software like MMF 1, 2 or later.**
 
-**MMF Express is a rebranded Click & Create.*
 
-Multimedia Fusion 2 and later pack a game a different way so KlikBack cannot read it. If you need to decompile them, try https://github.com/AITYunivers/NebulaFD. 
+Fusion 2.5 and later pack a game a different way so KlikBack cannot read it. If you need to decompile them, try https://github.com/AITYunivers/NebulaFD. 
 
-Extension modules (`.cox` / `.gox`) are carved out of the game itself, so a game that needs an extension your machine has never had still comes back with that extension beside it. Note that these extensions might be runtime versions, not editor ones. For any missing editor versions check: 
+Extension modules (`.cox` / `.gox` / `.mfx`) can be carved out of the game itself. Note that these extensions might be runtime versions, not editor ones. For any missing editor versions check: 
 
 - CnC/TGF [Encyclofusion](https://encyclofusion.github.io/GET/) 
 - MMF 1.0/1.5 [MMF Extension Archive](https://just-addwater.github.io/MMF-Extension-Archive/)
@@ -50,7 +50,7 @@ Most people want the packaged app, a plain folder with no installer: [download t
 
 | Version | SHA-256 |
 |---|---|
-| 1.0.0 .exe | 353af7a5ad3ce6363314d71b31bcc780ecf9845b5b530999659cc5d64159574f |
+| 1.1.1 .exe | d5f006bc9f0ff4a550ef860b16134a4ce6fca19fa630fa16353d46ec302ecbcd |
 
 From source, you need Python 3.13 or newer:
 
