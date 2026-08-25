@@ -59,6 +59,8 @@ def option_flags(options: dict) -> list[str]:
         flags.append("--no-substitute-artwork")
     if options.get("repair_bank"):
         flags.append("--repair-bank")
+    if options.get("repair_object_data"):
+        flags.append("--repair-object-data")
     if options.get("drop_missing_assets"):
         flags.append("--drop-missing-assets")
     repack = options.get("repack_placement")
@@ -70,6 +72,21 @@ def option_flags(options: dict) -> list[str]:
             flags.append(str(repack))
     for directory in options.get("extension_dirs") or []:
         flags += ["--extensions-dir", str(directory)]
+    # MMF 2.0. Each family's folder goes only to its own flag: the 1.5
+    # folder holds .cox files and the 2.0 folder .mfx files, and a folder
+    # handed to the wrong engine is a scan that can only report "not
+    # installed" for everything.
+    if options.get("mmf2_extension_dir"):
+        flags += ["--mmf2-extensions-dir", str(options["mmf2_extension_dir"])]
+    if not options.get("section_labels", True):
+        flags.append("--no-section-labels")
+    for module in options.get("strip_extensions") or []:
+        flags += ["--strip-extension", str(module)]
+    # Per file, never per run: the window chooses which modules to remove
+    # on each game's own card, and a batch of games shares nothing.
+    for path, modules in (options.get("strip_for") or {}).items():
+        for module in modules:
+            flags += ["--strip-for", str(path), str(module)]
     return flags
 
 
@@ -104,6 +121,12 @@ def write_session_log(result: dict, options: dict) -> Path | None:
     ]
     if result.get("target"):
         lines.append(f"output:  {result['target']}")
+    # The options that applied to THIS file -- its family's, not the whole
+    # window's -- so a log read months later says what shaped it.
+    if result.get("applied"):
+        lines.append("")
+        lines.append("options in force for this file:")
+        lines += [f"  {line}" for line in result["applied"]]
     lines += ["", result.get("log", "").rstrip()]
     if result.get("advice"):
         lines += ["", f"note: {result['advice']}"]

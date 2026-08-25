@@ -9,8 +9,10 @@ sees is `web/index.html` + `app.js`; everything that decompiles is the CLI
 worker. pywebview is imported inside `main()` so that importing this
 module never requires it (the dev harness and the tests do not).
 
-Startup degrades politely: no pywebview or no WebView2 runtime shows a
-plain message box naming what to install, instead of a traceback.
+Startup degrades politely: a missing pywebview, or a window that will not
+start, shows a plain message box with the actual error and what to do about
+it, instead of a traceback -- and never blames a component the error did
+not name.
 """
 
 from __future__ import annotations
@@ -39,12 +41,81 @@ DEFAULT_SIZE = (780, 680)
 MIN_SIZE = (640, 540)
 
 
+def app_folder() -> Path:
+    """Where KlikBack itself lives: the exe's folder when frozen, the
+    `public/` root in development."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parents[3]
+
+
 def settings_path() -> Path:
     """`klikback.json` beside the exe -- the portable-zip rule: no
     registry, no AppData. In development it sits at the `public/` root."""
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).parent / "klikback.json"
-    return Path(__file__).resolve().parents[3] / "klikback.json"
+    return app_folder() / "klikback.json"
+
+
+def folder_name_problem(folder: Path) -> str | None:
+    """A plain account of a KlikBack folder name the window has failed
+    from, or None when the name is fine.
+
+    Release 1.0.0 would not open its window from `KlikBack-1.0.0 (1)` --
+    the name a browser gives a second download -- while the command line
+    in the same folder worked, and the message it showed blamed the
+    WebView2 runtime. The mechanism inside the .NET loader was never
+    established, and the same build opens from such a folder on the
+    machine this was written on, so this is a notice rather than a block:
+    it names the folder and the fix, before any .NET loader runs, and the
+    window is still tried.
+    """
+    if "(" not in str(folder) and ")" not in str(folder):
+        return None
+    return (
+        "KlikBack's own folder has a parenthesis in its path:\n"
+        f"    {folder}\n\n"
+        "That is the name a browser gives a second download of the same "
+        "file, and a folder named that way has stopped KlikBack's window "
+        "from opening before (the command line was not affected). If the "
+        "window does not open, rename the folder so that it has no ( or ) "
+        "in it -- for example KlikBack-2 -- and start KlikBack again. "
+        "Nothing else needs to change."
+    )
+
+
+def startup_failure_text(problem: BaseException) -> str:
+    """What to tell someone whose window did not start: the error itself,
+    first and verbatim, then only the advice that error supports.
+
+    The shipped message used to assert that the WebView2 runtime was
+    missing whatever had actually failed, with the real error as an
+    afterthought in parentheses -- so a .NET loader fault sent people off
+    to install a browser component and nothing changed. WebView2 is named
+    as the cause only when the error names it; otherwise it is one thing
+    to check, after the error and after the folder name."""
+    detail = f"{type(problem).__name__}: {problem}"
+    text = f"KlikBack could not start its window.\n\nThe error was:\n    {detail}"
+    folder_note = folder_name_problem(app_folder())
+    if folder_note is not None:
+        text += "\n\n" + folder_note
+    mentions_webview = any(
+        word in str(problem).lower()
+        for word in ("webview2", "webview", "microsoft edge", "edge runtime"))
+    if mentions_webview:
+        text += (
+            "\n\nThis names the Microsoft Edge WebView2 runtime, which "
+            "KlikBack's window needs and which ships with up-to-date "
+            f"Windows 10 and 11. Install it from:\n    {WEBVIEW2_LINK}"
+        )
+    else:
+        text += (
+            "\n\nIf that does not explain it: KlikBack's window needs the "
+            "Microsoft Edge WebView2 runtime (part of every up-to-date "
+            f"Windows 10 and 11), available from\n    {WEBVIEW2_LINK}\n"
+            "and the command line, klikback-cli.exe in the same folder, "
+            "works without the window. Otherwise this is worth reporting, "
+            f"with the error above, at:\n    {PROJECT_LINK}"
+        )
+    return text
 
 
 def reveal(path: str) -> None:
@@ -85,8 +156,8 @@ def measure_output(result: dict) -> dict:
     """How much a finished file actually put on disk, as bytes and a count.
 
     Three shapes are counted and no others: the rebuilt project itself, the
-    extension modules carved into `<stem>_cox` / `<stem>_gox` beside it, and
-    the session log. Never the whole output folder -- the default output
+    extension modules carved into `<stem>_cox` / `<stem>_gox` (or, for a
+    2.0 game, `<stem>.extracted`) beside it, and the session log. Never the whole output folder -- the default output
     folder is the game's own, and weighing that would report the user's
     game collection back at them as if KlikBack had written it. The cost of
     being that careful is that a 1.5 game with external sub-applications
@@ -99,11 +170,15 @@ def measure_output(result: dict) -> dict:
         return {"bytes": 0, "files": 0}
     target = Path(target)
     stem = target.stem
+    # A stripped 2.0 recovery carries a second marker after the suffix,
+    # so it comes off first.
+    if stem.endswith(".stripped"):
+        stem = stem[: -len(".stripped")]
     suffix = api.Options().suffix  # ".decompiled", one source of truth
     if stem.endswith(suffix):
         stem = stem[: -len(suffix)]
     wanted = [target]
-    for carved in (f"{stem}_cox", f"{stem}_gox"):
+    for carved in (f"{stem}_cox", f"{stem}_gox", f"{stem}.extracted"):
         folder = target.parent / carved
         if folder.is_dir():
             wanted += [found for found in folder.rglob("*") if found.is_file()]
@@ -311,8 +386,9 @@ class Api:
 
     # -- inspection and dialogs -------------------------------------------
 
-    def inspect(self, path: str) -> dict:
-        return api.inspect(Path(path)).as_dict()
+    def inspect(self, path: str, mmf2_extensions_dir: str | None = None) -> dict:
+        folder = Path(mmf2_extensions_dir) if mmf2_extensions_dir else None
+        return api.inspect(Path(path), folder).as_dict()
 
     def expand(self, paths: list[str]) -> list[str]:
         """Folders become their candidate files, exactly as the CLI walks
@@ -451,46 +527,56 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     bridge = Api([str(Path(p).resolve()) for p in args.paths], args.autorun)
-    geometry = restore_geometry(bridge.load_settings().get("window") or {})
-    window = webview.create_window(
-        f"{PRODUCT} {__version__}",
-        str(WEB_DIR / "index.html"),
-        js_api=bridge,
-        width=geometry.get("width", DEFAULT_SIZE[0]),
-        height=geometry.get("height", DEFAULT_SIZE[1]),
-        # Absent means "put it where you like" -- which is what a first run,
-        # or a saved position that no longer lands on a screen, both want.
-        x=geometry.get("x"),
-        y=geometry.get("y"),
-        min_size=MIN_SIZE,
-    )
-    bridge.attach(window)
+    settings = bridge.load_settings()
 
-    def shown() -> None:
-        _brand_title_bar(window)
+    # Said once per folder, before any .NET loader runs, and then the
+    # window is still tried: a notice about a name that has broken the
+    # window before, not a refusal to run from it. Remembered in the
+    # settings file so a folder the window turns out to open from is not
+    # nagged about on every launch.
+    folder = app_folder()
+    folder_note = folder_name_problem(folder)
+    if folder_note is not None and settings.get("folder_notice") != str(folder):
+        _message_box(PRODUCT, folder_note + "\n\nKlikBack will now try to "
+                     "open its window anyway.")
+        settings["folder_notice"] = str(folder)
+        bridge.save_settings(settings)
 
-    def loaded() -> None:
-        try:
-            window.dom.document.events.drop += bridge.on_drop
-        except Exception as problem:
-            print(f"drop registration failed: {problem}", file=sys.stderr)
-
-    def closing() -> None:
-        bridge.remember_window()
-
-    window.events.shown += shown
-    window.events.loaded += loaded
-    window.events.closing += closing
+    geometry = restore_geometry(settings.get("window") or {})
     try:
+        window = webview.create_window(
+            f"{PRODUCT} {__version__}",
+            str(WEB_DIR / "index.html"),
+            js_api=bridge,
+            width=geometry.get("width", DEFAULT_SIZE[0]),
+            height=geometry.get("height", DEFAULT_SIZE[1]),
+            # Absent means "put it where you like" -- which is what a first
+            # run, or a saved position that no longer lands on a screen,
+            # both want.
+            x=geometry.get("x"),
+            y=geometry.get("y"),
+            min_size=MIN_SIZE,
+        )
+        bridge.attach(window)
+
+        def shown() -> None:
+            _brand_title_bar(window)
+
+        def loaded() -> None:
+            try:
+                window.dom.document.events.drop += bridge.on_drop
+            except Exception as problem:
+                print(f"drop registration failed: {problem}", file=sys.stderr)
+
+        def closing() -> None:
+            bridge.remember_window()
+
+        window.events.shown += shown
+        window.events.loaded += loaded
+        window.events.closing += closing
         webview.start(debug=args.debug)
     except Exception as problem:
-        _message_box(
-            PRODUCT,
-            "KlikBack could not start its window. It needs the Microsoft "
-            "Edge WebView2 runtime, which ships with up-to-date Windows 10 "
-            f"and 11.\n\nInstall it from:\n    {WEBVIEW2_LINK}\n\n"
-            f"(The underlying error was: {problem})",
-        )
+        _message_box(PRODUCT, startup_failure_text(problem))
         return 1
     return 0
 

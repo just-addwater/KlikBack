@@ -84,8 +84,9 @@ class Bridge:
     def set_title(self, title: str) -> None:
         pass  # the browser tab titles itself from document.title
 
-    def inspect(self, path: str) -> dict:
-        return api.inspect(Path(path)).as_dict()
+    def inspect(self, path: str, mmf2_extensions_dir: str | None = None) -> dict:
+        folder = Path(mmf2_extensions_dir) if mmf2_extensions_dir else None
+        return api.inspect(Path(path), folder).as_dict()
 
     def expand(self, paths: list[str]) -> list[str]:
         return [str(p) for p in api.collect_targets([Path(p) for p in paths])]

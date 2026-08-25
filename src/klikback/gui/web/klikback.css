@@ -565,10 +565,11 @@
  * does the same job from the keyboard. */
 .kb-queue-table th.kb-remove-head,
 .kb-queue-table td.kb-remove-cell {
-  width: 20px;
+  /* Two glyphs now: the folder opener for a finished row, then the x. */
+  width: 38px;
   padding-left: 0;
   padding-right: 2px;
-  text-align: center;
+  text-align: right;
 }
 
 .kb-remove {
@@ -585,6 +586,19 @@
   background: #a02020;
   color: #fff;
 }
+
+/* The row's own way to its output, shown only once there is one. */
+.kb-open-row {
+  display: inline-block;
+  width: 18px;
+  line-height: 15px;
+  text-align: center;
+  font-size: 11px;
+  cursor: default;
+  user-select: none;
+}
+
+.kb-open-row:hover { background: #d5e3f7; }
 
 /* --- options ------------------------------------------------------------ */
 
@@ -866,7 +880,42 @@
   margin-bottom: 2px;
 }
 
-/* --- the installed-extensions section ----------------------------------- */
+/* --- the family blocks inside Recovery options --------------------------
+ *
+ * One block per game family, each headed by the family it applies to and
+ * shown only while a game of that family is in the list. That is the
+ * mixed-batch rule drawn rather than explained: what is on screen is what
+ * applies. */
+
+.kb-family-hint {
+  color: #555;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 2px 2px 6px;
+  max-width: 640px;
+}
+
+.kb-family {
+  margin-top: 6px;
+  padding: 4px 8px 6px;
+  background: #f2f2ee;
+  box-shadow: inset 1px 1px var(--button-shadow),
+              inset -1px -1px var(--button-highlight);
+}
+
+.kb-family-head {
+  font-weight: 600;
+  font-size: 12px;
+  color: #333;
+  margin-bottom: 3px;
+}
+
+.kb-family-note {
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
+/* --- the installed-extensions sections ---------------------------------- */
 
 .kb-ext-note {
   color: #444;
@@ -874,6 +923,130 @@
   line-height: 1.5;
   margin: 2px 2px 6px;
   max-width: 640px;
+}
+
+/* --- the extension modules of a 2.0 game, on its card ------------------- */
+
+.kb-ext-block {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--button-shadow);
+}
+
+.kb-ext-head {
+  font-weight: 600;
+  font-size: 12px;
+  color: #333;
+  margin-bottom: 3px;
+}
+
+/* The module list folds shut by default; its one-line summary carries the
+ * count and any warning chips, so closed still answers the first
+ * question. */
+.kb-ext-details > summary {
+  font-weight: 600;
+  font-size: 12px;
+  color: #333;
+  padding: 1px 0 2px;
+}
+
+.kb-ext-details[open] > summary { margin-bottom: 3px; }
+
+/* A chip that goes somewhere when clicked. */
+.kb-linkish {
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.kb-ext-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.kb-ext-table th,
+.kb-ext-table td {
+  text-align: left;
+  padding: 2px 8px 2px 0;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.kb-ext-table th {
+  color: #555;
+  font-weight: 600;
+  border-bottom: 1px solid var(--button-shadow);
+}
+
+.kb-ext-table td:first-child {
+  white-space: normal;
+}
+
+.kb-ext-title { color: #666; }
+
+.kb-ext-ok      { color: #1d5c1d; }
+.kb-ext-unknown { color: #666; }
+.kb-ext-missing {
+  color: #6b5200;
+  background: #f4e6bd;
+  padding: 0 6px 1px;
+  border-radius: 8px;
+}
+
+/* Present in the folder but unreadable inside: a caution, not a verdict,
+   so it takes the warn colour without the chip's filled background --
+   less loud than "not installed", which is a fact rather than a doubt. */
+.kb-ext-caution {
+  color: #6b5200;
+  border-bottom: 1px dotted #b39338;
+}
+
+.kb-ext-remove { text-align: center; }
+
+/* Said in full the moment a removal is ticked, where the tick is. */
+.kb-ext-warning {
+  margin-top: 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  background: #f4e6bd;
+  color: #5a4400;
+  box-shadow: inset 1px 1px var(--button-shadow),
+              inset -1px -1px var(--button-highlight);
+}
+
+/* --- removals and options in force, inside Details ---------------------- */
+
+.kb-stripped {
+  margin: 4px 0 6px;
+  padding: 6px 8px;
+  background: #f4e6bd;
+  color: #5a4400;
+  line-height: 1.5;
+  box-shadow: inset 1px 1px var(--button-shadow),
+              inset -1px -1px var(--button-highlight);
+}
+
+.kb-stripped-head { font-weight: 600; }
+
+.kb-stripped ul {
+  margin: 3px 0 4px;
+  padding-left: 22px;
+}
+
+.kb-stripped-note { color: #5a4400; }
+
+.kb-applied {
+  margin: 6px 0 2px;
+}
+
+.kb-applied summary { color: #333; }
+
+.kb-applied ul {
+  margin: 3px 0 4px;
+  padding-left: 22px;
+  line-height: 1.5;
+  color: #555;
 }
 
 /* --- tooltips (the classic pale-yellow kind) ---------------------------- */

@@ -89,9 +89,57 @@ const STAGE_TEXT = {
   write: "Writing…",
   levels: "Restoring levels…",
   layout: "Laying out the file…",
+  extensions: "Carving extension modules…",
+  convert: "Rebuilding the project…",
 };
 
 const LOOP_NOUN = { frames: "Frame", levels: "Level" };
+
+/* Which option family a kind belongs to -- the same table the facade keeps
+ * (`api.FAMILY_OF_KIND`). It decides which option blocks are on screen:
+ * every option is global to the run and each game takes the ones its own
+ * family has, so a block is shown only while a game of its family is in
+ * the list. That is the whole of the mixed-batch rule, made visible. */
+const FAMILY_OF_KIND = {
+  mmf1: "mmf1", "mmf1-ccn": "mmf1",
+  mmf15: "mmf15", "mmf15-ccn": "mmf15",
+  "tgf-exe": "tgf", "tgf-data": "tgf", "tgf-damaged": "tgf",
+  mmf2: "mmf2", "mmf2-ccn": "mmf2",
+};
+
+function familyOf(file) {
+  return FAMILY_OF_KIND[file.inspection.kind] || null;
+}
+
+/* The queue's own spelling of what a file is. The full label ("Multimedia
+ * Fusion 2.0 compiled application (.ccn)") is written for the card and
+ * elides uselessly in a 215px column, so the column shows a short form and
+ * carries the full label in its tooltip. */
+const SHORT_LABELS = {
+  mmf1: "MMF 1.0", "mmf1-ccn": "MMF 1.0 .ccn",
+  mmf15: "MMF 1.5", "mmf15-ccn": "MMF 1.5 .ccn",
+  mmf2: "MMF 2.0", "mmf2-ccn": "MMF 2.0 .ccn",
+  "mmf-unknown": "MMF, unknown build",
+  fusion2: "Fusion 2.5 or newer",
+  "tgf-exe": "TGF/CnC", "tgf-data": "TGF/CnC data",
+  "tgf-damaged": "TGF/CnC, incomplete",
+  "mmf-editable": "editable project",
+  "not-clickteam": "not a Clickteam game",
+  unreadable: "unreadable",
+};
+
+function shortLabel(inspection) {
+  return SHORT_LABELS[inspection.kind] || inspection.product;
+}
+
+/* What an idle row's chip says about a file that will not be decompiled.
+ * A bare dash answered "what will happen to this?" with punctuation. */
+function idleStatus(inspection) {
+  if (inspection.decompilable) return "ready";
+  if (inspection.kind === "fusion2") return "not supported";
+  if (inspection.kind === "mmf-editable") return "already a project";
+  return "skipped";
+}
 
 /* Each stage owns a band of the bar, so the fill climbs once per file
  * instead of sprinting to 100% for every stage. The weights are rough
@@ -105,6 +153,8 @@ const STAGE_BANDS = {
   write: [0.97, 1],
   levels: [0.02, 0.85],
   layout: [0.85, 0.97],
+  extensions: [0.02, 0.10],
+  convert: [0.10, 0.97],
 };
 
 const BANNER_ICON = {
@@ -120,6 +170,11 @@ const CHIP_CLASS = {
   invalid: "kb-chip-bad",
   failed: "kb-chip-bad",
   error: "kb-chip-bad",
+  // Neither is a fault of the run: one is a product KlikBack does not
+  // read, the other a file it could not identify or open. They used to
+  // arrive as "nothing-to-do" and wear no chip class at all.
+  unsupported: "kb-chip-warn",
+  unrecognised: "kb-chip-warn",
   "working…": "kb-chip-run",
 };
 
@@ -130,10 +185,23 @@ const CHIP_CLASS = {
  * counted against the game. The engine's wording is never altered --
  * this is presentation-side triage only. */
 const EXPECTED_LOSS_KINDS = [
+  // The 2.0 engine's own account of the merge comes first, because its
+  // wording ("comment row(s) added to mark where each inlined section
+  // begins") would otherwise land in the comment-text group below.
   {
-    pattern: /preview thumbnail|icon artwork|object icon|icon's own pixels|application icons cannot be recovered|editor icon/i,
+    pattern: /inlined section|INLINED into the event list|inlined global-events|inlined from .*global-events|SHAPE: this project's global events|event group\(s\) came from an inlined|comment row\(s\) added to mark/i,
+    label: "Global events and behaviours, merged into their frames",
+    why: "all recovered and working - the compiler merged them into each " +
+      "frame that used them and dropped the page names, so each section " +
+      "sits in its frame behind a yellow label row saying where it came " +
+      "from",
+  },
+  {
+    pattern: /preview thumbnail|icon artwork|object icon|icon's own pixels|application icons cannot be recovered|editor icon|carry no picture of their own|take the icon of the module installed|icon slots are left transparent|recovered blank|application icon's 16x16 entry/i,
     label: "Icons and preview pictures",
-    why: "editor-only artwork the compiler never stored",
+    why: "editor-only artwork the compiler never stored; KlikBack draws " +
+      "each icon from the object's own picture, from your installed " +
+      "module, or from the artwork folder",
   },
   {
     pattern: /comment row|comment position/i,
@@ -143,33 +211,120 @@ const EXPECTED_LOSS_KINDS = [
   {
     pattern: /global event|ownerless|OWNER UNKNOWN|flattened into the frame|behaviour/i,
     label: "Global events and behaviours",
-    why: "all recovered and working — every event is present and runs " +
+    why: "all recovered and working - every event is present and runs " +
       "exactly as before; only the name of the page it was filed under " +
       "is gone, so each one sits in its frame behind a clear label",
   },
   {
-    pattern: /extension module title/i,
-    label: "Extension display names",
+    pattern: /extension module title|display name unknown, substituted|name lost at compile, substituted|had no name to recover/i,
+    label: "Extension and object display names",
     why: "games store which extension files they use but often not the " +
       "names shown in the editor; KlikBack recovers a name where it can " +
-      "and otherwise uses the filename — the extension itself works " +
+      "and otherwise uses the filename - the extension itself works " +
       "either way",
+  },
+  {
+    // `private block ... carried verbatim` was the whole wording until the
+    // engine started zeroing the four compile-baked bytes at +12, and this
+    // pattern was not moved with it. Every extension object in every game
+    // then arrived as something to review. BOTH wordings are matched now,
+    // and the shared `private block (N bytes) carried` prefix is what is
+    // keyed on, so the tail can change again without this going stale.
+    pattern: /is referenced by no object; carried into the bank unchanged|private block \(\d+ bytes\) carried/i,
+    label: "Carried through unchanged",
+    why: "pictures no object uses, and each extension object's private " +
+      "settings, are copied into the project exactly as the game holds " +
+      "them",
+  },
+  {
+    // Hardware-accelerated builds record runtime state the editor does not
+    // keep, and the install's own state rather than the project's. None of
+    // it is the game, none of it is recoverable, and none of it is a loss
+    // worth a reader's attention -- but every object and frame carries some,
+    // so unclassified it was the loudest thing in the report.
+    pattern: /unused ink parameter|frame-effects chunk at its default|carries bits 0x[0-9A-Fa-f]+, which record the state of the Multimedia Fusion installation|no project field is known to be bound to it/i,
+    label: "Runtime and installation state, not part of the project",
+    why: "values the compiler wrote for its own use - an unused effect " +
+      "slot, an empty effects chunk, a note of which installation built " +
+      "the game - which the editor does not store in a project either way",
   },
 ];
 
-function classifyLosses(losses) {
+/* The 2.0 engine also reports things that are not losses at all -- what
+ * it recovered and from where, which format build it wrote. Those are
+ * shown, because the report is the whole story, but they are information,
+ * not something to review. */
+const INFO_NOTE_PATTERN =
+  /recovered from the compiled file|names the project it was built from|is format build \d+; the \.mfa is written|default menu \(\d+ bytes\) is substituted|'include external files' is set|substituted the editor's \d+x\d+ default/i;
+
+/* What was cut out on purpose. Always shown first and never folded into
+ * "expected": it is the one line in the report that describes a choice
+ * rather than a limit, and the person reading it later may not be the
+ * person who made the choice. */
+const STRIPPED_PATTERN = /^STRIPPED/;
+
+/* A loss or note ENTRY is {text, more}: the worker condenses lines that
+ * repeat with only their numbers changed, and `more` is how many further
+ * lines matched the shown one's shape. One real game reported 46,000
+ * lines; the full report and the session log keep them all, while the
+ * card works with a few dozen entries. */
+
+function tally(entries) {
+  return entries.reduce((n, entry) => n + 1 + (entry.more || 0), 0);
+}
+
+function fmt(n) {
+  return n.toLocaleString();
+}
+
+function lineText(entry) {
+  return entry.text + (entry.more
+    ? " (and " + fmt(entry.more) + " more like this)"
+    : "");
+}
+
+function classifyLosses(losses, notes) {
   const expected = new Map();
   const notable = [];
-  for (const line of losses) {
-    const kind = EXPECTED_LOSS_KINDS.find((k) => k.pattern.test(line));
+  const info = [];
+  const stripped = [];
+  for (const entry of losses || []) {
+    const kind = EXPECTED_LOSS_KINDS.find((k) => k.pattern.test(entry.text));
     if (kind) {
       if (!expected.has(kind)) expected.set(kind, []);
-      expected.get(kind).push(line);
+      expected.get(kind).push(entry);
     } else {
-      notable.push(line);
+      notable.push(entry);
     }
   }
-  return { expected, notable };
+  for (const entry of notes || []) {
+    if (STRIPPED_PATTERN.test(entry.text)) {
+      stripped.push(entry);
+      continue;
+    }
+    const kind = EXPECTED_LOSS_KINDS.find((k) => k.pattern.test(entry.text));
+    if (kind) {
+      if (!expected.has(kind)) expected.set(kind, []);
+      expected.get(kind).push(entry);
+    } else if (INFO_NOTE_PATTERN.test(entry.text)) {
+      info.push(entry);
+    } else {
+      notable.push(entry);
+    }
+  }
+  return { expected, notable, info, stripped };
+}
+
+/* The classification, computed once per state of the file's report: the
+ * queue re-renders on every worker event, and running the pattern table
+ * over a big report each time is work with one answer. */
+function classifyFile(file) {
+  const stamp = (file.losses || []).length + ":" + (file.notes || []).length;
+  if (file._classifiedAs !== stamp) {
+    file._classified = classifyLosses(file.losses, file.notes);
+    file._classifiedAs = stamp;
+  }
+  return file._classified;
 }
 
 // A refused incomplete copy has no losses to list -- nothing ran -- so the
@@ -188,21 +343,32 @@ function detailsNote(result) {
 }
 
 const BANNERS = {
-  built: ["kb-good", (r) => "Decompiled — " + basename(r.target)],
+  built: ["kb-good", (r) => "Decompiled - " + basename(r.target)],
   // A refusal usually means the engine met something it will not
   // reconstruct wrongly. An incomplete copy is refused for the opposite
   // reason -- nothing about the game is the problem, the file is short of
   // bytes -- so it says so rather than blaming a feature.
+  // A TGF/CnC standalone keeps its game in a .gam or .cca beside it, and
+  // the only way this pipeline refuses one is that none of them could be
+  // used. Keyed on kind and outcome, the way the facade keys its advice.
   refused: ["kb-expected", (r) => r.kind === "tgf-damaged"
     ? "This copy of the game is incomplete."
-    : "This game uses a feature that cannot be reconstructed correctly."],
+    : r.kind === "tgf-exe"
+      ? "This game's data file could not be used."
+      : "This game uses a feature that cannot be reconstructed correctly."],
   invalid: ["kb-bad", () =>
     "The reconstruction failed its own validation."],
   failed: ["kb-bad", () => "Something unexpected went wrong."],
   error: ["kb-bad", () => "Something unexpected went wrong."],
   skipped: ["kb-neutral", () =>
-    "The output already exists — nothing was overwritten."],
+    "The output already exists - nothing was overwritten."],
   "nothing-to-do": ["kb-neutral", () => "Nothing to decompile."],
+  // Both were "Nothing to decompile." until 2026-08-24, which is true of
+  // a project that is already a project and false of these two.
+  unsupported: ["kb-expected", () =>
+    "KlikBack does not read this Clickteam product."],
+  unrecognised: ["kb-expected", () =>
+    "KlikBack could not read or recognise this file."],
 };
 
 function basename(path) {
@@ -225,14 +391,19 @@ async function addPaths(paths) {
   }
   for (const path of expanded) {
     if (fileByPath(path)) continue;
-    const inspection = await bridge.call("inspect", path);
+    const inspection = await bridge.call("inspect", path, mmf2Folder());
     state.files.push({
       path,
       name: basename(path),
       inspection,
-      status: inspection.decompilable ? "ready" : "—",
+      status: idleStatus(inspection),
       result: null,
       losses: [],
+      notes: [],
+      // MMF 2.0 only: the modules chosen for removal from THIS game. Per
+      // file by design -- a strip list names modules of one project, and
+      // a batch of games shares nothing. Nothing is ever pre-ticked.
+      strip: new Set(),
     });
     state.selected = path;
   }
@@ -240,6 +411,59 @@ async function addPaths(paths) {
   renderSelected();
   updateButtons();
   saveRecents(expanded);
+}
+
+function mmf2Folder() {
+  return el("mmf2-ext-dir").value.trim() || null;
+}
+
+/* Whether the cards may offer to remove a module at all: a Recovery
+ * option, off by default, so the ordinary card is a plain list of what the
+ * game needs and the destructive choice is only seen by somebody who
+ * turned it on. */
+function allowStrip() {
+  return el("opt-allowstrip").checked;
+}
+
+/* Turning the option off takes every ticked removal with it, so nothing
+ * armed on a card can outlive the control that showed it. */
+function onAllowStripChange() {
+  if (!allowStrip()) {
+    state.files.forEach((file) => { if (file.strip) file.strip.clear(); });
+  }
+  renderQueue();
+  renderSelected();
+}
+
+/* The MMF 2.0 folder changed: the cards' "installed" column answers from
+ * it, so every 2.0 game in the list is looked at again. The verdicts do
+ * not move -- only the extension rows read the folder -- and a removal
+ * already ticked stays ticked. */
+async function reinspectMmf2() {
+  if (state.running) return;
+  const folder = mmf2Folder();
+  let checked = 0;
+  for (const file of state.files) {
+    if (familyOf(file) !== "mmf2") continue;
+    try {
+      file.inspection = await bridge.call("inspect", file.path, folder);
+    } catch (ignored) {
+      continue;  // the file went away; its old card stands
+    }
+    checked += 1;
+    const known = new Set(file.inspection.extensions.map((r) => r.module));
+    file.strip = new Set([...file.strip].filter((m) => known.has(m)));
+  }
+  renderQueue();
+  renderSelected();
+  // Say what just happened: the installed column changing by itself reads
+  // as a glitch, not as an answer.
+  if (checked) {
+    setStatus(folder
+      ? "Checked " + checked + " MMF 2.0 game" + (checked === 1 ? "" : "s") +
+        " against the Extensions folder."
+      : "MMF 2.0 folder cleared - module install checks are off.");
+  }
 }
 
 function renderQueue() {
@@ -261,21 +485,32 @@ function renderQueue() {
     row.dataset.tip = file.path +
       "\nDouble-click a finished file to open its output folder; " +
       "Delete takes the selected one off the list.";
-    [file.name, file.inspection.product].forEach((text) => {
-      const cell = document.createElement("td");
-      cell.textContent = text;
-      row.appendChild(cell);
-    });
+    const nameCell = document.createElement("td");
+    nameCell.textContent = file.name;
+    row.appendChild(nameCell);
+    const whatCell = document.createElement("td");
+    whatCell.textContent = shortLabel(file.inspection);
+    // The full label, written for the card, rides in the cell's own tip so
+    // the short form costs nothing.
+    whatCell.dataset.tip = file.inspection.product;
+    row.appendChild(whatCell);
     const statusCell = document.createElement("td");
     statusCell.className = "kb-status-cell";
     const chip = document.createElement("span");
     chip.className = "kb-chip " + (CHIP_CLASS[file.status] || "kb-chip-neutral");
     let statusText = file.status;
     if (file.result) {
-      const { notable } = classifyLosses(file.losses);
-      if (notable.length) {
-        statusText += " · " + notable.length + " to review";
+      const { notable, stripped } = classifyFile(file);
+      if (stripped.length) {
+        statusText += " · modules removed";
       }
+      if (notable.length) {
+        statusText += " · " + fmt(tally(notable)) + " to review";
+      }
+    } else if (file.strip && file.strip.size) {
+      // A removal is the one per-game choice; the row says it is armed,
+      // so a batch can be checked at a glance before Decompile.
+      statusText += " · removes " + file.strip.size;
     }
     chip.textContent = statusText;
     statusCell.appendChild(chip);
@@ -286,6 +521,22 @@ function renderQueue() {
     // paths and cannot be told to forget one.
     const removeCell = document.createElement("td");
     removeCell.className = "kb-remove-cell";
+    // A finished row can open its output without the double-click secret:
+    // the same folder the result pane's button shows, from the row itself.
+    const where = file.result &&
+      (file.result.target || file.result.session_log);
+    if (where) {
+      const opener = document.createElement("span");
+      opener.className = "kb-open-row";
+      opener.textContent = "📁";
+      opener.dataset.tip = "Show what was written for " + file.name +
+        " in Explorer.";
+      opener.addEventListener("click", (event) => {
+        event.stopPropagation();  // opening is not also selecting
+        bridge.call("open_folder", where);
+      });
+      removeCell.appendChild(opener);
+    }
     if (!state.running) {
       const cross = document.createElement("span");
       cross.className = "kb-remove";
@@ -312,9 +563,36 @@ function renderQueue() {
     });
     body.appendChild(row);
   }
-  const any1996 = state.files.some(
-    (file) => file.inspection.kind.startsWith("tgf"));
-  el("options-1996").classList.toggle("kb-hidden", !any1996);
+  renderFamilyBlocks();
+}
+
+/* Show each family's option block only while a game of that family is in
+ * the list. One rule for every block, read from the markup, so adding a
+ * family is a `data-families` attribute rather than a new special case. */
+function renderFamilyBlocks() {
+  const present = new Set(state.files.map(familyOf).filter(Boolean));
+  document.querySelectorAll(".kb-family[data-families]").forEach((block) => {
+    const wanted = block.dataset.families.split(/\s+/);
+    block.classList.toggle("kb-hidden",
+      !wanted.some((family) => present.has(family)));
+  });
+  // The disclosure stays collapsed (user's call), so its summary carries a
+  // live count of what is inside it for the games listed: a closed line
+  // that says "(5 for the games listed)" is an invitation, a bare one is
+  // furniture.
+  const visible = document.querySelectorAll(
+    "#recovery-options .kb-family:not(.kb-hidden) .field-row").length;
+  el("recovery-summary").textContent = visible
+    ? "Recovery options (" + visible + " for the games listed)"
+    : "Recovery options";
+  // One line either way: what the hint needs to say depends on whether
+  // there is anything to explain yet.
+  el("family-hint").textContent = visible
+    ? "Each block applies to the game family it names; games of other " +
+      "families ignore it, and every game's report lists what was in " +
+      "force for it."
+    : "Options for each game family appear here once a game of that " +
+      "family is in the list.";
 }
 
 /* Take one file off the list -- the row's × and the Delete key share this.
@@ -333,7 +611,7 @@ function removeFile(path) {
   renderSelected();
   updateButtons();
   if (state.files.length) {
-    setStatus("Removed " + gone.name + " — " + state.files.length +
+    setStatus("Removed " + gone.name + " - " + state.files.length +
       " file" + (state.files.length === 1 ? "" : "s") + " left.");
   } else {
     setProgress(null);
@@ -403,7 +681,7 @@ function renderSelected() {
   };
   if (inspection.build) fact("build " + inspection.build);
   fact(sizeText(inspection.size));
-  // Only the 1996 families report protection at all, so the tooltip can
+  // Only the TGF/CnC families report protection at all, so the tooltip can
   // say what it means for them without hedging. It is worth saying: the
   // word looks like a warning, and here it is the ordinary case.
   if (inspection.protected !== null && inspection.protected !== undefined) {
@@ -412,7 +690,7 @@ function renderSelected() {
       inspection.protected
         ? "The game's data is scrambled so the editor cannot open it. " +
           "That is normal for a game published in this era, and KlikBack " +
-          "unscrambles it — nothing extra is needed from you."
+          "unscrambles it - nothing extra is needed from you."
         : "The game's data is stored plainly, so there is nothing to " +
           "unscramble. It still needs rebuilding into a project.");
   }
@@ -422,7 +700,7 @@ function renderSelected() {
   // rather than by anything it cannot do.
   if (inspection.kind === "tgf-damaged") {
     fact("incomplete copy", "kb-fact-warn",
-      "The file stops partway through its last sound or image bank — " +
+      "The file stops partway through its last sound or image bank - " +
       "what an interrupted download leaves behind. Everything before that " +
       "point is intact, so ticking “TGF/CnC: open an incomplete copy” " +
       "rebuilds it without the assets whose bytes are missing.");
@@ -452,10 +730,230 @@ function renderSelected() {
   // send them after a file that is perfectly fine.
   if (!inspection.decompilable && inspection.kind !== "fusion2") {
     line("kb-inspect-note kb-inspect-nope",
-      "This doesn’t look like a decompilable Clickteam game — " +
+      "This doesn’t look like a decompilable Clickteam game - " +
       "the signatures checked are listed above.");
   }
+  renderExtensions(file);
   renderResult(file);
+}
+
+/* The extension modules a 2.0 game asks for, and the one choice made per
+ * game: which of them to remove from the recovered project.
+ *
+ * Why the control lives here and not in Options: a removal names modules
+ * of ONE project, so a batch of games shares nothing -- the list is built
+ * from this game's own inspection, which is also what makes the engine's
+ * unknown-name refusal unreachable from the window. Nothing is ever
+ * pre-ticked: a module the editor here lacks is marked, and that mark is
+ * a suggestion, not a decision. */
+const REMOVE_TIP =
+  "Leave this module out of the recovered project - its objects and the " +
+  "event lines that used them - so the editor stops asking for a file " +
+  "you do not have. That content is gone from the output (written as a " +
+  "separate .stripped.mfa); the game file itself is untouched, and " +
+  "installing the module instead keeps everything.";
+
+function renderExtensions(file) {
+  const box = el("inspect-extensions");
+  box.textContent = "";
+  const rows = (file.inspection.extensions || []);
+  const isMmf2 = familyOf(file) === "mmf2";
+  box.classList.toggle("kb-hidden", !isMmf2 || rows.length === 0);
+  if (!isMmf2 || rows.length === 0) return;
+
+  // Collapsed by default (user's call): the plain card stays plain, and
+  // the folded line still answers the first question -- how many modules,
+  // whether any is missing here, whether a removal is armed. Armed
+  // removals force it open, so nothing destructive ever hides.
+  const missing = rows.filter((row) => row.installed === false).length;
+  const doubtful = rows.filter((row) => row.installed && row.unversioned)
+    .length;
+  const group = document.createElement("details");
+  group.className = "kb-ext-details";
+  group.open = !!file.extOpen || file.strip.size > 0;
+  group.addEventListener("toggle", () => { file.extOpen = group.open; });
+  const summary = document.createElement("summary");
+  summary.appendChild(document.createTextNode(
+    "Extension modules this game needs (" + rows.length + ")"));
+  if (missing) {
+    const flag = document.createElement("span");
+    flag.className = "kb-ext-missing";
+    flag.textContent = missing + " not installed";
+    summary.appendChild(document.createTextNode(" "));
+    summary.appendChild(flag);
+  }
+  if (doubtful) {
+    // Worth the fold line for the same reason "not installed" is: it is a
+    // module the editor may ask for, and the summary is where somebody
+    // decides whether to open the list at all.
+    const shaky = document.createElement("span");
+    shaky.className = "kb-ext-caution";
+    shaky.textContent = doubtful + " with no version";
+    summary.appendChild(document.createTextNode(" "));
+    summary.appendChild(shaky);
+  }
+  if (file.strip.size) {
+    const armed = document.createElement("span");
+    armed.className = "kb-ext-missing";
+    armed.textContent = "removes " + file.strip.size;
+    summary.appendChild(document.createTextNode(" "));
+    summary.appendChild(armed);
+  }
+  group.appendChild(summary);
+  box.appendChild(group);
+
+  const table = document.createElement("table");
+  table.className = "kb-ext-table";
+  const thead = document.createElement("thead");
+  const hr = document.createElement("tr");
+  [["Module", ""],
+   ["In the game", "A 2.0 game carries the RUNTIME build of each module, " +
+     "which plays the game but cannot be loaded by the editor. It is " +
+     "carved out beside the project when extraction is on."],
+   ["In your MMF 2.0 folder", "Whether the EDITOR build is in the " +
+     "Extensions folder set below. The editor needs that one to open the " +
+     "project."],
+   // The Remove column exists only while the Recovery option allows it
+   // (user's call, 2026-08-23): the plain card is a list of what the game
+   // needs, and a destructive choice is not offered to someone who did
+   // not ask to see it.
+   ...(allowStrip() ? [["Remove", REMOVE_TIP]] : []),
+  ].forEach(([text, tip]) => {
+    const th = document.createElement("th");
+    th.textContent = text;
+    if (tip) th.dataset.tip = tip;
+    hr.appendChild(th);
+  });
+  thead.appendChild(hr);
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  const folderSet = !!mmf2Folder();
+  for (const row of rows) {
+    const tr = document.createElement("tr");
+    const name = document.createElement("td");
+    name.textContent = row.module;
+    if (row.title) {
+      const title = document.createElement("span");
+      title.className = "kb-ext-title";
+      title.textContent = " " + row.title;
+      name.appendChild(title);
+    }
+    tr.appendChild(name);
+
+    const inside = document.createElement("td");
+    // "Runtime copy only" (the user's wording): the copy in the game
+    // plays it but is not the build the editor loads -- the column
+    // header's tip says why.
+    inside.textContent = row.embedded
+      ? "Runtime copy only"
+      : (row.shipped ? "beside it" : "no");
+    if (row.shipped) inside.dataset.tip = row.shipped;
+    tr.appendChild(inside);
+
+    const installed = document.createElement("td");
+    const mark = document.createElement("span");
+    if (row.installed === null || row.installed === undefined) {
+      mark.className = "kb-ext-unknown";
+      mark.textContent = folderSet ? "not checked" : "set the folder below";
+      mark.dataset.tip = "Point the MMF 2.0 Extensions folder option at " +
+        "your editor's Extensions folder and this column says whether " +
+        "the editor here has each module." +
+        (folderSet ? "" : " Click to go to that option.");
+      if (!folderSet) {
+        // The field this points at is two collapsed disclosures away;
+        // a pointer that opens them beats directions to them.
+        mark.classList.add("kb-linkish");
+        mark.addEventListener("click", revealMmf2FolderOption);
+      }
+    } else if (row.installed && row.unversioned) {
+      // Present, but nothing readable inside it. A weaker answer than
+      // "installed", and it is the honest one: this check reads the
+      // module's version resource, and a module that has none has
+      // something wrong that the editor may well object to.
+      mark.className = "kb-ext-caution";
+      mark.textContent = "present, no version";
+      mark.dataset.tip =
+        "The file is in your Extensions folder, but no version could be " +
+        "read out of it, which usually means something inside it is " +
+        "damaged. The editor may still ask for this module when it opens " +
+        "the project. Replacing it with a good copy is the fix." +
+        (row.installed_path ? " " + row.installed_path : "");
+    } else if (row.installed) {
+      mark.className = "kb-ext-ok";
+      mark.textContent = "installed" + (row.version ? " " + row.version : "");
+      if (row.installed_path) mark.dataset.tip = row.installed_path;
+    } else {
+      mark.className = "kb-ext-missing";
+      mark.textContent = "not installed";
+      const misses = (row.near_misses || []);
+      mark.dataset.tip =
+        "The editor will ask for this module when it opens the project. " +
+        "Install it in your Extensions folder" +
+        (allowStrip()
+          ? ", or tick Remove to leave its objects and events out."
+          : ". If nobody can supply it, the Recovery option 'Allow " +
+            "removing extension modules from a game' lets you leave its " +
+            "objects and events out instead.") +
+        (misses.length
+          ? " Installed under another name? " +
+            misses.map(([n, t]) => n + " (" + (t || "no title") + ")").join(", ") +
+            " - a different release, not a substitute: the project names " +
+            "the module by filename."
+          : "");
+    }
+    installed.appendChild(mark);
+    tr.appendChild(installed);
+
+    if (allowStrip()) {
+      const remove = document.createElement("td");
+      remove.className = "kb-ext-remove";
+      const tick = document.createElement("input");
+      tick.type = "checkbox";
+      tick.checked = file.strip.has(row.module);
+      tick.disabled = state.running;
+      tick.dataset.tip = REMOVE_TIP;
+      tick.setAttribute("aria-label",
+        "Remove " + row.module + " from the project");
+      tick.addEventListener("change", () => {
+        if (tick.checked) file.strip.add(row.module);
+        else file.strip.delete(row.module);
+        renderQueue();
+        renderExtensions(file);
+      });
+      remove.appendChild(tick);
+      tr.appendChild(remove);
+    }
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  group.appendChild(table);
+
+  // Said in full the moment anything is ticked, where the tick is.
+  if (file.strip.size) {
+    const warn = document.createElement("div");
+    warn.className = "kb-ext-warning";
+    const chosen = [...file.strip].join(", ");
+    warn.textContent =
+      "Removing " + chosen + " from this project: every object of " +
+      (file.strip.size === 1 ? "this module" : "these modules") +
+      " and every event line and action that used them will be left " +
+      "out, and cannot be put back from the output. The game file is " +
+      "untouched; the project is written as " +
+      file.name.replace(/\.[^.]+$/, "") + ".decompiled.stripped.mfa, " +
+      "beside any complete recovery. Installing the module instead " +
+      "keeps everything.";
+    group.appendChild(warn);
+  }
+}
+
+/* Open the collapsed disclosures between a card's "set the folder below"
+ * and the field it means, then hand the keyboard to the field. */
+function revealMmf2FolderOption() {
+  const details = el("mmf2-extensions-option");
+  details.open = true;
+  details.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  el("mmf2-ext-dir").focus();
 }
 
 /* How big to draw a game's own icon in a 64px frame.
@@ -546,31 +1044,75 @@ function renderResult(file) {
   const note = el("loss-note");
   note.textContent = noteText;
   note.classList.toggle("kb-hidden", !noteText);
-  lossDetails.classList.toggle("kb-hidden",
-    file.losses.length === 0 && !noteText);
-  const { expected, notable } = classifyLosses(file.losses);
+  const applied = result.applied || [];
+  const { expected, notable, info, stripped } = classifyFile(file);
+  // Counts include what the condensed entries stand for, so the summary
+  // still says 46,000 where the list shows a dozen lines.
+  const notableCount = tally(notable);
   const expectedCount =
-    [...expected.values()].reduce((n, lines) => n + lines.length, 0);
-  // The summary is generated from counts, so the note-only case needs a
-  // line of its own rather than a count of nothing.
-  el("loss-summary").textContent = notable.length
-    ? "Details — " + notable.length + " thing" +
-      (notable.length === 1 ? "" : "s") + " worth reading" +
-      (expectedCount ? " (and " + expectedCount + " expected)" : "")
-    : expectedCount
-      ? "Details — " + expectedCount + " expected compile loss" +
-        (expectedCount === 1 ? "" : "es") + " (normal)"
-      : "Details — what to try next";
+    [...expected.values()].reduce((n, entries) => n + tally(entries), 0);
+  const infoCount = tally(info);
+  // Options-in-force lives on its own line now, so Details is hidden the
+  // moment there is nothing to actually review -- a clean game no longer
+  // claims it has something worth opening.
+  lossDetails.classList.toggle("kb-hidden",
+    !notable.length && !expectedCount && !info.length && !stripped.length &&
+    !noteText);
+
+  // The summary is generated from counts. Removals come first because they
+  // are the one line that describes a choice rather than a limit.
+  const parts = [];
+  if (stripped.length) parts.push("modules removed, as asked");
+  if (notableCount) {
+    parts.push(fmt(notableCount) + " thing" +
+      (notableCount === 1 ? "" : "s") + " worth reading");
+  }
+  if (expectedCount) {
+    parts.push(fmt(expectedCount) + " expected compile loss" +
+      (expectedCount === 1 ? "" : "es") + " (normal)");
+  }
+  el("loss-summary").textContent = parts.length
+    ? "Details - " + parts.join(", ")
+    : (infoCount
+      ? "Details - " + fmt(infoCount) + " note" +
+        (infoCount === 1 ? "" : "s") + " about the recovery"
+      : "Details - what to try next");
+
+  const strippedBox = el("stripped-box");
+  strippedBox.textContent = "";
+  strippedBox.classList.toggle("kb-hidden", stripped.length === 0);
+  if (stripped.length) {
+    const head = document.createElement("div");
+    head.className = "kb-stripped-head";
+    head.textContent = "Removed from this project, at your request";
+    strippedBox.appendChild(head);
+    const items = document.createElement("ul");
+    for (const entry of stripped) {
+      const item = document.createElement("li");
+      item.textContent = lineText(entry);
+      items.appendChild(item);
+    }
+    strippedBox.appendChild(items);
+    const why = document.createElement("div");
+    why.className = "kb-stripped-note";
+    why.textContent =
+      "This content is not in the output and cannot be put back from it. " +
+      "The game file is untouched, and a complete recovery is one run " +
+      "away: install the module in your MMF 2.0 Extensions folder and " +
+      "decompile again with nothing ticked for removal.";
+    strippedBox.appendChild(why);
+  }
+
   const list = el("loss-list");
   list.textContent = "";
-  for (const loss of notable) {
+  for (const entry of notable) {
     const item = document.createElement("li");
-    item.textContent = loss;
+    item.textContent = lineText(entry);
     list.appendChild(item);
   }
   const expectedBox = el("expected-losses");
   expectedBox.textContent = "";
-  expectedBox.classList.toggle("kb-hidden", expectedCount === 0);
+  expectedBox.classList.toggle("kb-hidden", expectedCount === 0 && !info.length);
   if (expectedCount) {
     const note = document.createElement("div");
     note.className = "kb-expected-note";
@@ -579,21 +1121,27 @@ function renderResult(file) {
       "good, so every compiled game is missing it whatever decompiles " +
       "it; KlikBack writes safe stand-ins where it can.";
     expectedBox.appendChild(note);
-    for (const [kind, lines] of expected) {
-      const group = document.createElement("details");
-      const summary = document.createElement("summary");
-      summary.textContent =
-        kind.label + " — " + kind.why + " (" + lines.length + ")";
-      group.appendChild(summary);
-      const items = document.createElement("ul");
-      for (const line of lines) {
-        const item = document.createElement("li");
-        item.textContent = line;
-        items.appendChild(item);
-      }
-      group.appendChild(items);
-      expectedBox.appendChild(group);
+    for (const [kind, entries] of expected) {
+      expectedBox.appendChild(foldedList(
+        kind.label + " - " + kind.why + " (" + fmt(tally(entries)) + ")",
+        entries));
     }
+  }
+  if (info.length) {
+    expectedBox.appendChild(foldedList(
+      "What was recovered, and from where (" + fmt(infoCount) + ")", info));
+  }
+
+  // Which options shaped THIS file -- its family's, not the whole
+  // window's. In a mixed batch that is the only honest answer to "what
+  // did my settings do to this game".
+  const appliedBox = el("applied-box");
+  appliedBox.textContent = "";
+  appliedBox.classList.toggle("kb-hidden", applied.length === 0);
+  if (applied.length) {
+    appliedBox.appendChild(foldedList(
+      "Options in force for this file (" + (applied.length - 1) + ")",
+      applied));
   }
   el("log-text").textContent = result.log || "";
 
@@ -607,8 +1155,26 @@ function renderResult(file) {
   el("copy-log-button").onclick = async () => {
     setStatus(await copyText(logFileText(file))
       ? "Report copied to the clipboard."
-      : "The clipboard refused the report — use Save log instead.");
+      : "The clipboard refused the report - use Save log instead.");
   };
+}
+
+/* A collapsed heading with a list under it -- the shape every group in the
+ * Details block takes. Takes plain strings (the options list) and
+ * condensed {text, more} entries alike. */
+function foldedList(heading, lines) {
+  const group = document.createElement("details");
+  const summary = document.createElement("summary");
+  summary.textContent = heading;
+  group.appendChild(summary);
+  const items = document.createElement("ul");
+  for (const line of lines) {
+    const item = document.createElement("li");
+    item.textContent = typeof line === "string" ? line : lineText(line);
+    items.appendChild(item);
+  }
+  group.appendChild(items);
+  return group;
 }
 
 /* Save log needs a native dialog and so is dead in the dev preview; Copy
@@ -664,11 +1230,34 @@ function collectOptions() {
     ownerless_recovery: el("opt-ownerless").checked,
     substitute_artwork: el("opt-artwork").checked,
     repair_bank: el("opt-repairbank").checked,
+    repair_object_data: el("opt-repairobjectdata").checked,
     repack_placement: el("opt-repackplacement").checked,
     drop_missing_assets: el("opt-dropmissing").checked,
     extension_dirs: el("ext-dir").value.trim()
       ? [el("ext-dir").value.trim()] : [],
+    // MMF 2.0. Two folders for two installs: the 1.5 one above holds .cox
+    // files and serves 1.0/1.5 names; this one holds .mfx files and
+    // serves 2.0 icons and the card's installed column. The worker hands
+    // each to its own family only.
+    mmf2_extension_dir: mmf2Folder(),
+    section_labels: el("opt-sectionlabels").checked,
+    // A window-side gate only: it decides whether the cards show a Remove
+    // column, and the worker never sees it. The removals themselves go
+    // through `collectStrips`.
+    allow_strip: allowStrip(),
   };
+}
+
+/* The one per-file option, keyed by path: which modules each 2.0 game
+ * has ticked for removal. Kept out of the saved settings on purpose -- a
+ * removal belongs to a game, not to the window. */
+function collectStrips() {
+  const strips = {};
+  if (!allowStrip()) return strips;
+  for (const file of state.files) {
+    if (file.strip && file.strip.size) strips[file.path] = [...file.strip];
+  }
+  return strips;
 }
 
 async function go() {
@@ -683,6 +1272,7 @@ async function go() {
     if (file.inspection.decompilable) file.status = "queued";
     file.result = null;
     file.losses = [];
+    file.notes = [];
     file.written = null;
   });
   renderQueue();
@@ -707,7 +1297,8 @@ async function go() {
   startHeartbeat();
   const options = collectOptions();
   saveSettings(options);
-  const accepted = await bridge.call("start", paths, options);
+  const accepted = await bridge.call(
+    "start", paths, { ...options, strip_for: collectStrips() });
   if (!accepted) {
     state.running = false;
     stopHeartbeat();
@@ -764,13 +1355,21 @@ function onEvent(event) {
       const noun = LOOP_NOUN[event.stage] || "Step";
       const band = STAGE_BANDS[event.stage] || [0, 1];
       setProgress(band[0] + (event.n / event.of) * (band[1] - band[0]));
-      setRunStatus(noun + " " + event.n + " of " + event.of + " — " +
+      setRunStatus(noun + " " + event.n + " of " + event.of + " - " +
         (STAGE_TEXT[event.stage] || event.stage).toLowerCase(), false);
       break;
     }
     case "loss": {
       const file = fileByPath(state.currentPath);
-      if (file) file.losses.push(event.text);
+      if (file) file.losses.push({ text: event.text, more: event.more || 0 });
+      break;
+    }
+    case "note": {
+      // The 2.0 engine's report lines -- substitutions, what was merged,
+      // what was removed. Kept apart from losses because they are sorted
+      // differently: a removal is shown first, information last.
+      const file = fileByPath(state.currentPath);
+      if (file) file.notes.push({ text: event.text, more: event.more || 0 });
       break;
     }
     case "result": {
@@ -820,17 +1419,17 @@ function onEvent(event) {
       }
       state.files.forEach((file) => {
         if (file.status === "working…" || file.status === "queued") {
-          file.status = state.cancelling ? "cancelled" : "—";
+          file.status = state.cancelling ? "cancelled" : "not run";
         }
       });
       renderQueue();
       if (state.cancelling) {
         setStatus("Cancelled");
       } else if (state.blocked) {
-        setStatus("Nothing was decompiled — see below.");
+        setStatus("Nothing was decompiled - see below.");
         showBlocked(state.blocked);
       } else if (!state.sawResult && event.returncode !== 0) {
-        setStatus("The worker crashed — details below.");
+        setStatus("The worker crashed - details below.");
         showCrash(event);
       } else {
         setStatus(tallyText());
@@ -866,7 +1465,7 @@ function showBlocked(event) {
   advice.classList.remove("kb-hidden");
   advice.textContent =
     "Nothing was read and nothing was written. The game you queued is " +
-    "untouched — fix the file below and run it again.";
+    "untouched - fix the file below and run it again.";
   el("open-folder-button").classList.add("kb-hidden");
   el("loss-details").classList.add("kb-hidden");
   el("log-text").textContent = event.text || "";
@@ -882,7 +1481,7 @@ function showCrash(event) {
   const advice = el("result-advice");
   advice.classList.remove("kb-hidden");
   advice.textContent =
-    "This is not a refusal — it is a fault worth reporting. " +
+    "This is not a refusal - it is a fault worth reporting. " +
     "The output below is the crash log.";
   el("open-folder-button").classList.add("kb-hidden");
   el("loss-details").classList.add("kb-hidden");
@@ -915,7 +1514,7 @@ function clockText(seconds) {
 /* The window's own title tracks the run, so a KlikBack left minimised
  * during a long decompile still says where it is from the taskbar. */
 function setWindowTitle(text) {
-  const title = text ? PRODUCT_TITLE + " — " + text : PRODUCT_TITLE;
+  const title = text ? PRODUCT_TITLE + " - " + text : PRODUCT_TITLE;
   if (document.title !== title) {
     document.title = title;
     bridge.call("set_title", title).catch(() => {});
@@ -1047,7 +1646,7 @@ function setStatus(text, announce = true) {
  * event, and then overwritten by the first stage a moment later -- so the
  * name was on screen for a fraction of a second per file. */
 function setRunStatus(text, announce = true) {
-  const named = state.batchName ? state.batchName + " — " + text : text;
+  const named = state.batchName ? state.batchName + " - " + text : text;
   setStatus(named, announce);
 }
 
@@ -1057,8 +1656,8 @@ function renderStatus() {
   field.textContent = state.running
     ? base.replace(/[.…]+$/, "") + ELLIPSIS[state.tick % ELLIPSIS.length]
     : base;
-  // The field cannot wrap, so a long message — a saved path, a 1996 game
-  // with a sentence for a filename — is cut with an ellipsis. Then it must
+  // The field cannot wrap, so a long message - a saved path, a TGF/CnC game
+  // with a sentence for a filename - is cut with an ellipsis. Then it must
   // still be readable, and only then: a tooltip on every status line would
   // be noise. The tip carries the settled text, not the animated one, so
   // it does not flicker under the cursor.
@@ -1091,7 +1690,7 @@ function startHeartbeat() {
     setWindowTitle([
       percent ? percent + "%" : "",
       state.currentPath ? basename(state.currentPath) : "",
-    ].filter(Boolean).join(" — "));
+    ].filter(Boolean).join(" - "));
   }, 400);
 }
 
@@ -1104,6 +1703,17 @@ function updateButtons() {
   el("go-button").disabled = state.running || state.files.length === 0;
   el("cancel-button").disabled = !state.running;
   el("clear-button").disabled = state.running;
+  // The button carries the count in a batch -- and when strangers will be
+  // skipped, says so before the run rather than letting the tally explain
+  // it afterwards. A single file keeps the plain verb: even a stranger
+  // named alone gets a full answer, so there is nothing to count.
+  const total = state.files.length;
+  const runnable = state.files.filter(
+    (file) => file.inspection.decompilable).length;
+  el("go-button").textContent =
+    total <= 1 ? "Decompile"
+      : runnable < total ? "Decompile " + runnable + " of " + total
+        : "Decompile " + total + " files";
 }
 
 /* ---------------------------------------------------------- settings */
@@ -1123,16 +1733,47 @@ function applySettings(settings) {
   set("opt-log", "session_log", true);
   set("opt-artwork", "substitute_artwork", true);
   set("opt-repairbank", "repair_bank", false);
+  set("opt-repairobjectdata", "repair_object_data", false);
   set("opt-repackplacement", "repack_placement", false);
   set("opt-dropmissing", "drop_missing_assets", false);
+  set("opt-sectionlabels", "section_labels", true);
+  set("opt-allowstrip", "allow_strip", false);
   el("out-dir").value = state.settings.out || "";
   el("ext-dir").value = (options.extension_dirs || [])[0] || "";
+  el("mmf2-ext-dir").value = options.mmf2_extension_dir || "";
 }
 
 function saveSettings(options) {
-  state.settings.options = options;
+  // Never the per-game removals: those are keyed by path and belong to
+  // the games in the list, not to the window.
+  const { strip_for: ignored, ...remembered } = options;
+  state.settings.options = remembered;
   state.settings.out = options.out || "";
   bridge.call("save_settings", state.settings).catch(() => {});
+}
+
+/* Settings used to be written at exactly two moments: when a run started,
+ * and when files were added. Nowhere else -- not on quit, not when an
+ * option changed. So a cold launch, tick an option, close left no
+ * settings file at all, which is the ordinary "it forgot everything I
+ * set" complaint and was entirely real.
+ *
+ * Every control now writes through. It is a small JSON file beside the
+ * exe and a person can only click so fast, but a text field fires on
+ * every keystroke, so the write is held back until typing stops. `flush`
+ * exists for the window closing, where there is no later. */
+let settingsTimer = null;
+
+function rememberSettings(delay) {
+  window.clearTimeout(settingsTimer);
+  settingsTimer = window.setTimeout(
+    () => saveSettings(collectOptions()), delay || 0);
+}
+
+function flushSettings() {
+  window.clearTimeout(settingsTimer);
+  settingsTimer = null;
+  saveSettings(collectOptions());
 }
 
 function saveRecents(paths) {
@@ -1200,7 +1841,7 @@ function renderRecent() {
   const forget = document.createElement("div");
   forget.className = "kb-menu-item";
   forget.dataset.tip =
-    "Empty this list. It only forgets the paths — no file is touched.";
+    "Empty this list. It only forgets the paths - no file is touched.";
   forget.textContent = "Forget these";
   forget.addEventListener("click", () => {
     closeRecent();
@@ -1324,7 +1965,7 @@ function onKey(event) {
 
 async function openGames() {
   if (state.harness) {
-    setStatus("No native dialogs in the dev preview — use the path box.");
+    setStatus("No native dialogs in the dev preview - use the path box.");
     return;
   }
   const chosen = await bridge.call("browse_files");
@@ -1368,7 +2009,7 @@ function wire() {
 
   el("out-browse").addEventListener("click", async () => {
     if (state.harness) {
-      setStatus("No native dialogs in the dev preview — " +
+      setStatus("No native dialogs in the dev preview - " +
         "type the folder.");
       return;
     }
@@ -1377,13 +2018,48 @@ function wire() {
   });
   el("ext-browse").addEventListener("click", async () => {
     if (state.harness) {
-      setStatus("No native dialogs in the dev preview — " +
+      setStatus("No native dialogs in the dev preview - " +
         "type the folder.");
       return;
     }
     const chosen = await bridge.call("browse_folder");
     if (chosen) el("ext-dir").value = chosen;
   });
+  el("mmf2-ext-browse").addEventListener("click", async () => {
+    if (state.harness) {
+      setStatus("No native dialogs in the dev preview - " +
+        "type the folder.");
+      return;
+    }
+    const chosen = await bridge.call("browse_folder");
+    if (chosen) {
+      el("mmf2-ext-dir").value = chosen;
+      reinspectMmf2();
+    }
+  });
+  // The card's installed column answers from this folder, so a change
+  // here re-reads every 2.0 game in the list.
+  el("mmf2-ext-dir").addEventListener("change", reinspectMmf2);
+  el("opt-allowstrip").addEventListener("change", onAllowStripChange);
+
+  /* Remember every option the moment it changes -- see rememberSettings.
+   * Driven off the form itself rather than a list of ids, so an option
+   * added later cannot be forgotten by omission: that is exactly how
+   * `--no-subapps` came to have no control and no saved key. Text fields
+   * wait for typing to stop; ticks are written at once. */
+  document.querySelectorAll("input, select, textarea").forEach((control) => {
+    const typed = control.type === "text" || control.tagName === "TEXTAREA";
+    control.addEventListener("change", () => rememberSettings(0));
+    if (typed) control.addEventListener("input", () => rememberSettings(700));
+  });
+  // And once more on the way out, for anything still inside the
+  // hold-back window. Whether an embedded browser runs these on the way
+  // to being destroyed is not something to rely on, which is why the
+  // change handlers above are the actual fix and these are a backstop:
+  // by the time either fires, everything but the last few hundred
+  // milliseconds of typing is already on disk.
+  window.addEventListener("beforeunload", flushSettings);
+  window.addEventListener("pagehide", flushSettings);
 
   el("go-button").addEventListener("click", go);
   el("cancel-button").addEventListener("click", () => {
@@ -1429,7 +2105,7 @@ function wire() {
     // paths) and pushes a "dropped" event; this handler only clears the
     // highlight there. A browser never reveals full paths at all.
     if (bridge.mode !== "pywebview" && event.dataTransfer.files.length) {
-      setStatus("Dropping needs the app window — in the dev preview, " +
+      setStatus("Dropping needs the app window - in the dev preview, " +
         "use the path box.");
     }
   });
@@ -1450,7 +2126,7 @@ window.kb = kb;
   PRODUCT_TITLE = config.product + " " + config.version;
   document.title = PRODUCT_TITLE;
   el("topbar-version").textContent = "v" + config.version;
-  setStatus("Ready — " + config.product + " " + config.version +
+  setStatus("Ready - " + config.product + " " + config.version +
     (state.harness ? " (dev preview)" : ""));
   if (config.autorun && config.autorun.length) {
     await addPaths(config.autorun);

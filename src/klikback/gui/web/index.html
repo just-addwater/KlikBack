@@ -38,7 +38,7 @@
       </div>
       <div class="kb-drop-title">Drop a game here</div>
       <div class="kb-drop-sub">
-        MMF 1.0 / 1.5 standalones &middot; TGF / Click &amp; Create games
+        MMF 1.0 / 1.5 / 2.0 standalones &middot; TGF / Click &amp; Create games
         &middot; .gam&ensp;.cca&ensp;.ccn
       </div>
       <div class="kb-drop-hint">Drop more games here</div>
@@ -64,6 +64,12 @@
         <div id="inspect-icon" class="kb-inspect-icon"></div>
         <div id="inspect-lines" class="kb-inspect-lines"></div>
       </div>
+      <!-- MMF 2.0 only: the extension modules the game asks for, and the
+           one choice that is made per game rather than per run -- which
+           of them to remove from the recovered project. Built by app.js
+           from the inspection's own list, so it can only ever name
+           modules the game uses. -->
+      <div id="inspect-extensions" class="kb-ext-block kb-hidden"></div>
     </fieldset>
 
     <div id="queue-wrap" class="sunken-panel kb-queue kb-hidden">
@@ -85,8 +91,6 @@
                placeholder="beside each input" spellcheck="false">
         <button id="out-browse">Choose&hellip;</button>
       </div>
-      <div class="kb-fine kb-out-hint">Leave the folder blank to write
-        beside each game file.</div>
       <div class="kb-option-columns">
         <div>
           <div class="field-row"
@@ -102,12 +106,12 @@
         </div>
         <div>
           <div class="field-row"
-               data-tip="Replace output files that already exist. Your original game files are never touched either way &mdash; that rule has no off switch.">
+               data-tip="Replace output files that already exist. Your original game files are never touched either way - that rule has no off switch.">
             <input id="opt-force" type="checkbox">
             <label for="opt-force">Overwrite existing output</label>
           </div>
           <div class="field-row"
-               data-tip="Write this report to a text file next to each rebuilt project, named after the game. Turn it off to leave no file behind &mdash; the report still appears here, and Copy log still works.">
+               data-tip="Write this report to a text file next to each rebuilt project, named after the game. Turn it off to leave no file behind - the report still appears here, and Copy log still works.">
             <input id="opt-log" type="checkbox" checked>
             <label for="opt-log">Save a log beside the output</label>
           </div>
@@ -115,73 +119,141 @@
       </div>
 
       <details id="recovery-options" class="kb-advanced">
-        <summary data-tip="Choices about how much KlikBack reconstructs when the original information is partly gone. The defaults are safe.">Recovery options</summary>
-        <div class="kb-option-columns">
-          <div>
-            <div class="field-row"
-                 data-tip="Rebuild the project&rsquo;s application icons from the icons stored inside the game&rsquo;s EXE. Turn it off to keep the editor&rsquo;s plain defaults instead.">
-              <input id="opt-appicons" type="checkbox" checked>
-              <label for="opt-appicons">Recover application icons</label>
+        <!-- Collapsed by default (user's call): the summary carries a live
+             count of what is inside it for the games listed, so a closed
+             disclosure still says whether it holds anything worth opening.
+             app.js writes both the count and the hint line. -->
+        <summary id="recovery-summary"
+                 data-tip="How much KlikBack reconstructs when the original information is partly gone. The defaults are safe to leave alone; README.txt explains every option in full.">Recovery options</summary>
+        <div id="family-hint" class="kb-family-hint">
+          Options for each game family appear here once a game of that
+          family is in the list.
+        </div>
+        <div id="options-mmf1x" class="kb-family kb-hidden"
+             data-families="mmf1 mmf15">
+          <div class="kb-family-head">Multimedia Fusion 1.0 / 1.5</div>
+          <div class="kb-option-columns">
+            <div>
+              <div class="field-row"
+                   data-tip="MMF 1.5: rebuild the project&rsquo;s application icons from the icons stored inside the game&rsquo;s EXE. Turn it off to keep the editor&rsquo;s plain defaults instead.">
+                <input id="opt-appicons" type="checkbox" checked>
+                <label for="opt-appicons">Recover application icons</label>
+              </div>
+              <div class="field-row"
+                   data-tip="MMF 1.5: compiled games forget which object owned some event pages. Keep this on to save those pages into the frame with an honest &lsquo;OWNER UNKNOWN&rsquo; note. Turn it off and such games are refused instead.">
+                <input id="opt-ownerless" type="checkbox" checked>
+                <label for="opt-ownerless">Recover ownerless behaviours / globals</label>
+              </div>
             </div>
-            <div class="field-row"
-                 data-tip="Compiled games forget which object owned some event pages. Keep this on to save those pages into the frame with an honest &lsquo;OWNER UNKNOWN&rsquo; note. Turn it off and such games are refused instead.">
-              <input id="opt-ownerless" type="checkbox" checked>
-              <label for="opt-ownerless">Recover ownerless behaviours / globals</label>
-            </div>
-          </div>
-          <div>
-            <div class="field-row"
-                 data-tip="Not recommended. Puts a comment row back at every position where the author had one. The position is real, but the original words are gone for good, so every row it adds carries stand-in text the author never wrote &mdash; on a large game that can be tens of thousands of rows. It is also the one option that can stop a decompile that otherwise works: a program where the compiler left an event group open has a row KlikBack put back rather than the author, and the recovery cannot number it. If a game fails with this on, turning it off is the first thing to rule out.">
-              <input id="opt-comments" type="checkbox">
-              <label for="opt-comments">Recover comment positions
-                <span class="kb-fine">(substituted text, not recommended)</span></label>
+            <div>
+              <div class="field-row"
+                   data-tip="Not recommended. Puts a comment row back at every position the author had one, but the words are gone for good, so every row carries stand-in text - and it can stop a decompile that works without it. README.txt explains more.">
+                <input id="opt-comments" type="checkbox">
+                <label for="opt-comments">Recover comment positions
+                  <span class="kb-fine">(substituted text, not recommended)</span></label>
+              </div>
             </div>
           </div>
         </div>
-        <div id="options-1996" class="kb-option-columns kb-hidden">
+        <div id="options-mmf2" class="kb-family kb-hidden" data-families="mmf2">
+          <div class="kb-family-head">Multimedia Fusion 2.0</div>
           <div class="field-row"
-               data-tip="Protected 1996 games had their icons and preview pictures stripped out. This writes blank stand-ins so the editor has something to show &mdash; the original pictures are gone either way.">
+               data-tip="The compiler merged the game&rsquo;s global events and behaviours into each frame; every event is recovered and runs as before. This adds a yellow comment row where each merged section begins - the rows are KlikBack&rsquo;s, not the author&rsquo;s, which is why you can leave them out.">
+            <input id="opt-sectionlabels" type="checkbox" checked>
+            <label for="opt-sectionlabels">Mark where merged global events and behaviours begin
+              <span class="kb-fine">(yellow comment rows)</span></label>
+          </div>
+          <div class="field-row"
+               data-tip="For a game that needs an extension nobody can get, so the editor refuses to open the rebuilt project. This shows a Remove column on each MMF 2.0 game&rsquo;s card; what you tick there is left out of that game&rsquo;s output, which is written as a separate .stripped.mfa. Nothing is ever ticked for you; README.txt explains the cost.">
+            <input id="opt-allowstrip" type="checkbox">
+            <label for="opt-allowstrip">Allow removing extension modules from a game
+              <span class="kb-fine">(advanced; chosen per game, on its card)</span></label>
+          </div>
+        </div>
+        <div id="options-1996" class="kb-family kb-hidden" data-families="tgf">
+          <div class="kb-family-head">TGF / Click &amp; Create</div>
+          <div class="kb-option-columns">
+            <div class="field-row"
+                 data-tip="Re-encodes the few bank images MMF 1.5 refuses while the TGF/CnC editors open them fine. Off, the bank is byte-identical to the original.">
+              <input id="opt-repairbank" type="checkbox">
+              <label for="opt-repairbank">Re-encode bank images MMF refuses</label>
+            </div>
+            <div class="field-row"
+                 data-tip="MMF 1.5 can refuse a whole game over one damaged object head that the TGF/CnC editors open fine. This restores the head from the object&rsquo;s own structure - rederived, never substituted - and a healthy file comes back byte for byte either way.">
+              <input id="opt-repairobjectdata" type="checkbox">
+              <label for="opt-repairobjectdata">Repair object data MMF refuses</label>
+            </div>
+            <div class="field-row"
+                 data-tip="MMF 1.5 can refuse a TGF/CnC project over the order one level lists its object placements, while the TGF/CnC editors open it fine. This rewrites just that order; nothing on screen moves.">
+              <input id="opt-repackplacement" type="checkbox">
+              <label for="opt-repackplacement">Reorder placement pointers MMF refuses</label>
+            </div>
+            <div class="field-row"
+                 data-tip="Opens a download that stopped early by dropping only the assets whose bytes are missing - nothing is invented, nothing else moves. Off, an incomplete copy is refused and says so.">
+              <input id="opt-dropmissing" type="checkbox">
+              <label for="opt-dropmissing">Open an incomplete copy
+                <span class="kb-fine">(drops missing assets)</span></label>
+            </div>
+          </div>
+        </div>
+        <div id="options-artwork" class="kb-family kb-hidden"
+             data-families="tgf mmf2">
+          <div class="kb-family-head">TGF / Click &amp; Create and Multimedia Fusion 2.0</div>
+          <div class="field-row"
+               data-tip="Where a game has no picture for an icon, write a stand-in rather than nothing: blank icons for TGF/CnC games, drawings from the artwork folder for MMF 2.0 objects with no picture of their own. The original pictures are gone either way.">
             <input id="opt-artwork" type="checkbox" checked>
-            <label for="opt-artwork">TGF/CnC: substitute blank icons / thumbnails</label>
-          </div>
-          <div class="field-row"
-               data-tip="Some 1996 image banks open fine in their own editor but not in MMF 1.5. This re-encodes just those pictures &mdash; exactly where the image record still describes itself, and as a best-effort fill where the picture is already missing from the file. Off by default: without it the bank is byte-identical to the original.">
-            <input id="opt-repairbank" type="checkbox">
-            <label for="opt-repairbank">TGF/CnC: re-encode bank images MMF refuses</label>
-          </div>
-          <div class="field-row"
-               data-tip="MMF 1.5 can refuse a whole 1996 project over the order one level lists its object placements in, while all three 1996 editors open the same file happily. This rewrites that order &mdash; a few dozen bytes. The placements themselves do not move, so what is on top of what is unchanged; only the order the objects were placed in. Off by default, and a level already in order is unaffected either way.">
-            <input id="opt-repackplacement" type="checkbox">
-            <label for="opt-repackplacement">TGF/CnC: reorder placement pointers MMF refuses</label>
-          </div>
-          <div class="field-row"
-               data-tip="Some 1996 downloads stopped before the file was finished, so the last sound or image bank runs off the end. Everything before that point is intact. This opens the game anyway by dropping the assets whose bytes are not in the file &mdash; nothing is invented, nothing else moves, and what is dropped was already gone. Off by default: without it an incomplete copy is refused and says so.">
-            <input id="opt-dropmissing" type="checkbox">
-            <label for="opt-dropmissing">TGF/CnC: open an incomplete copy
-              <span class="kb-fine">(drops missing assets)</span></label>
+            <label for="opt-artwork">Substitute stand-in icons where the game has none
+              <span class="kb-fine">(TGF/CnC: blank icons / thumbnails; MMF 2.0: the artwork folder)</span></label>
           </div>
         </div>
       </details>
 
-      <details id="extensions-option" class="kb-advanced">
-        <summary>Installed extensions (optional)</summary>
+      <details id="extensions-option" class="kb-advanced kb-family kb-hidden"
+               data-families="mmf1 mmf15">
+        <summary>Multimedia Fusion 1.5 Extensions folder (optional)</summary>
         <div class="kb-ext-note">
-          Games carry their extension objects, but often not the names
-          the editor displays for them. If Multimedia Fusion is
-          installed, point KlikBack at its <b>Extensions</b> folder and
-          the missing names are recovered from your installed copies —
-          you are also warned if an installed extension is older than
-          the one the game was built with. KlikBack only
-          <b>scans</b> this folder: nothing in it is copied or changed.
-          Leave it blank to skip the scan; games still decompile either
-          way.
+          MMF 1.0 and 1.5 games carry their extension objects (.cox
+          files), but often not the names the editor displays for them.
+          If Multimedia Fusion 1.5 is installed, point KlikBack at its
+          <b>Extensions</b> folder and the missing names are recovered
+          from your installed copies - you are also warned if an
+          installed extension is older than the one the game was built
+          with. KlikBack only <b>scans</b> this folder: nothing in it is
+          copied or changed. Leave it blank to skip the scan; games still
+          decompile either way. (MMF 2.0 games use their own folder,
+          below.)
         </div>
         <div class="field-row kb-out-row">
-          <label for="ext-dir">Extensions folder</label>
+          <label for="ext-dir">MMF 1.5 Extensions folder</label>
           <input id="ext-dir" type="text"
                  placeholder="for example C:\Multimedia Fusion\Extensions"
                  spellcheck="false">
           <button id="ext-browse">Choose&hellip;</button>
+        </div>
+      </details>
+
+      <details id="mmf2-extensions-option" class="kb-advanced kb-family kb-hidden"
+               data-families="mmf2">
+        <summary>Multimedia Fusion 2.0 Extensions folder (optional)</summary>
+        <div class="kb-ext-note">
+          A different install for a different job. Point KlikBack at your
+          Multimedia Fusion 2 <b>Extensions</b> folder (the folder
+          itself, holding the .mfx files) and two things happen: an
+          extension object in the recovered project gets its module&rsquo;s
+          own icon, exactly as the editor would draw it, and the card
+          above says which of a game&rsquo;s modules your editor has, by
+          name and version. A module the folder lacks falls back to a
+          stand-in icon and is named in the report. KlikBack only
+          <b>reads</b> this folder - nothing in it is copied or
+          changed - and it never goes looking for one: the folder
+          you give is the only one it opens.
+        </div>
+        <div class="field-row kb-out-row">
+          <label for="mmf2-ext-dir">MMF 2.0 Extensions folder</label>
+          <input id="mmf2-ext-dir" type="text"
+                 placeholder="for example C:\Multimedia Fusion 2\Extensions"
+                 spellcheck="false">
+          <button id="mmf2-ext-browse">Choose&hellip;</button>
         </div>
       </details>
     </fieldset>
@@ -208,11 +280,19 @@
       <div class="kb-result-more">
         <details id="loss-details" class="kb-hidden">
           <summary id="loss-summary"
-                   data-tip="Content the engine knows it could not bring back &mdash; each line says what and why. Expected items are normal for every compiled game.">Details</summary>
+                   data-tip="Content the engine knows it could not bring back - each line says what and why. Expected items are normal for every compiled game.">Details</summary>
           <p id="loss-note" class="kb-loss-note kb-hidden"></p>
+          <!-- What was cut out at the user's own request: first, and in
+               the warning colour, because it is the one thing in this
+               block that is not a limit of the game but a choice. -->
+          <div id="stripped-box" class="kb-stripped kb-hidden"></div>
           <ul id="loss-list" class="kb-loss-list"></ul>
           <div id="expected-losses"></div>
         </details>
+        <!-- Its own line, not part of Details: which options shaped this
+             file is bookkeeping, and folding it into the review list made
+             a clean game claim it had something worth reading. -->
+        <div id="applied-box" class="kb-applied kb-hidden"></div>
         <details id="log-details">
           <summary>Full report</summary>
           <pre id="log-text" class="kb-log"></pre>
