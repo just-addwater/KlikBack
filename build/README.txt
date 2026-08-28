@@ -1,4 +1,4 @@
-KlikBack 1.1.1
+KlikBack 1.1.2
 ==============
 
 KlikBack turns a compiled Clickteam game back into an editable project.
@@ -57,11 +57,15 @@ If the window does not open
 
 KlikBack shows the actual error it met. Two things to check, in order:
 
-  * The folder KlikBack is in. A parenthesis in the name --
-    "KlikBack-1.1.1 (1)", which is what a browser calls a second
-    download -- has stopped the window before, while the command line
-    in the same folder worked. KlikBack says so at startup. Rename the
-    folder without ( or ) and start it again.
+  * Whether Windows has marked the files as downloaded. A zip fetched
+    with a browser carries that mark, Explorer copies it onto every
+    file it extracts, and the window cannot load one of its own
+    components while it is set -- the command line is unaffected.
+    KlikBack asks, once, whether to clear that mark from its own
+    files, and does nothing unless you say yes. It is the same thing
+    as right-clicking the folder, Properties, Unblock. You can also
+    unblock the ZIP before extracting it, which avoids the whole
+    thing.
 
   * The Microsoft Edge WebView2 runtime, which the window needs and
     which is part of every up-to-date Windows 10 and 11. If the error
