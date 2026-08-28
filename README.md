@@ -50,7 +50,7 @@ Most people want the packaged app, a plain folder with no installer: [download t
 
 | Version | SHA-256 |
 |---|---|
-| 1.1.1 .exe | d5f006bc9f0ff4a550ef860b16134a4ce6fca19fa630fa16353d46ec302ecbcd |
+| 1.1.2 .exe | f23fa8b4836a9483b296b25e97e1b23d284e26296c237a08f608c7e2c2cc1c47 |
 
 From source, you need Python 3.13 or newer:
 
@@ -96,7 +96,7 @@ src/klikback/
   gui/            the window (pywebview shell) and the page it hosts
   resources.py    checks the bundled resources and explains what is missing
   core/           the decompilation engine
-    mmf1/  mmf15/  tgf/  common/
+    mmf1/  mmf15/  tgf/  mmf2/ common/
     artwork/      the drawings used where a game has no icon of its own
 build/            PyInstaller spec, build script, packaged README
 branding/         icon
