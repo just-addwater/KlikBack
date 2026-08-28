@@ -55,30 +55,112 @@ def settings_path() -> Path:
     return app_folder() / "klikback.json"
 
 
-def folder_name_problem(folder: Path) -> str | None:
-    """A plain account of a KlikBack folder name the window has failed
-    from, or None when the name is fine.
+#: The .NET assembly the window's toolkit loads, relative to the app
+#: folder. Windows marking THIS ONE file is enough to stop the window; see
+#: `blocked_by_windows`.
+RUNTIME_ASSEMBLY = Path("_internal") / "pythonnet" / "runtime" / "Python.Runtime.dll"
 
-    Release 1.0.0 would not open its window from `KlikBack-1.0.0 (1)` --
-    the name a browser gives a second download -- while the command line
-    in the same folder worked, and the message it showed blamed the
-    WebView2 runtime. The mechanism inside the .NET loader was never
-    established, and the same build opens from such a folder on the
-    machine this was written on, so this is a notice rather than a block:
-    it names the folder and the fix, before any .NET loader runs, and the
-    window is still tried.
+
+def carries_web_mark(path: Path) -> bool:
+    """Whether Windows has marked this file as downloaded.
+
+    The mark is an alternate data stream named `Zone.Identifier`, which
+    opens like a file whose name is `<path>:Zone.Identifier` and is simply
+    absent otherwise. Anything that is not a plain readable NTFS file
+    answers False: a mark that cannot be read is not a mark this can
+    report on."""
+    try:
+        with open(f"{path}:Zone.Identifier", "rb"):
+            return True
+    except OSError:
+        return False
+
+
+def unblock_own_files(folder: Path) -> tuple[int, int]:
+    """Clear the downloaded-from-the-internet mark from KlikBack's own
+    files. Returns `(cleared, could not clear)`.
+
+    **Why a program is entitled to do this to itself.** The mark exists so
+    that a person decides, knowingly, whether to run something that came
+    off the internet. That decision has already been made and acted on by
+    the time this runs: Windows put SmartScreen in front of `KlikBack.exe`
+    and somebody chose Run anyway. What is cleared here is the payload of
+    the very program now executing, inside its own folder -- nothing the
+    user has not already consented to run, and nothing outside it. Without
+    this, the ordinary way to get KlikBack (download the zip, extract it
+    with Explorer) produces an app whose window cannot open at all.
+
+    **It is never done without being asked.** The caller puts a yes/no
+    box up first, once per folder, defaulting to No -- because removing
+    this mark is also what malware does to hide where it came from
+    (ATT&CK T1553.005), and an unsigned program that strips it unasked has
+    earned any suspicion it attracts. Asked and answered, it is the same
+    operation as the Unblock tickbox in the folder's own Properties.
+
+    Deliberately narrow: only files under `folder`, only the
+    `Zone.Identifier` stream, and only ever removing it -- no attributes,
+    no permissions, no content. Anything that will not clear is counted
+    and left, and `blocked_by_windows` then reports it in full.
     """
-    if "(" not in str(folder) and ")" not in str(folder):
+    cleared = stuck = 0
+    for path in folder.rglob("*"):
+        if not path.is_file() or not carries_web_mark(path):
+            continue
+        try:
+            os.remove(f"{path}:Zone.Identifier")
+            cleared += 1
+        except OSError:
+            stuck += 1
+    return cleared, stuck
+
+
+def blocked_by_windows(folder: Path) -> str | None:
+    """A plain account of the download mark that stops KlikBack's window,
+    or None when nothing is marked.
+
+    **This replaces the parenthesis notice, and it is the same defect.**
+    Release 1.0.0 would not open its window from `KlikBack-1.0.0 (1)`,
+    while the command line in the same folder worked, and the folder name
+    was blamed for two releases. It was never the name. `(1)` is what a
+    browser calls a SECOND DOWNLOAD, a browser download is what carries
+    the Mark of the Web, and Explorer stamps that mark onto every file it
+    extracts from such a zip -- so the parenthesis was a fingerprint of
+    where the folder came from, not a cause. That is why the same build
+    opened from four parenthesised folders when it was tested with a zip
+    that had never been through a browser.
+
+    Measured 2026-08-25, single variable, on one machine, both ways: the
+    mark on `Python.Runtime.dll` ALONE is enough to produce
+    `RuntimeError: Failed to resolve Python.Runtime.Loader.Initialize`,
+    and removing it is enough to fix it. The command line is untouched
+    either way, because it is pure standard library and never loads that
+    assembly.
+
+    Reached when the mark is still there after the offer to clear it: the
+    user said no, or clearing failed on a read-only folder or a network
+    share. Either way the window is about to fail, so this names the file
+    and the fix by hand.
+    """
+    assembly = folder / RUNTIME_ASSEMBLY
+    if not carries_web_mark(assembly):
         return None
+    marked = sum(1 for path in folder.rglob("*")
+                 if path.is_file() and carries_web_mark(path))
     return (
-        "KlikBack's own folder has a parenthesis in its path:\n"
-        f"    {folder}\n\n"
-        "That is the name a browser gives a second download of the same "
-        "file, and a folder named that way has stopped KlikBack's window "
-        "from opening before (the command line was not affected). If the "
-        "window does not open, rename the folder so that it has no ( or ) "
-        "in it -- for example KlikBack-2 -- and start KlikBack again. "
-        "Nothing else needs to change."
+        "Windows has marked KlikBack's files as downloaded from the "
+        f"internet ({marked} of them), which stops the window from "
+        "opening:\n"
+        f"    {assembly}\n\n"
+        "That happens when a zip is downloaded with a browser and then "
+        "extracted, because the mark travels to every file inside. The "
+        "window needs to load that file and Windows will not let it.\n\n"
+        "To fix it, in either order:\n"
+        "  * right-click the folder, choose Properties, and tick Unblock "
+        "if it is offered; or\n"
+        "  * right-click the ZIP first, Properties, Unblock, then extract "
+        "it again into a new folder.\n\n"
+        "klikback-cli.exe in the same folder is not affected and works "
+        "now."
     )
 
 
@@ -94,9 +176,12 @@ def startup_failure_text(problem: BaseException) -> str:
     to check, after the error and after the folder name."""
     detail = f"{type(problem).__name__}: {problem}"
     text = f"KlikBack could not start its window.\n\nThe error was:\n    {detail}"
-    folder_note = folder_name_problem(app_folder())
-    if folder_note is not None:
-        text += "\n\n" + folder_note
+    blocked = blocked_by_windows(app_folder())
+    if blocked is not None:
+        # Named right under the error, and before WebView2 is mentioned at
+        # all: when the files are marked, this IS the explanation, and the
+        # measured fix is two clicks away.
+        text += "\n\n" + blocked
     mentions_webview = any(
         word in str(problem).lower()
         for word in ("webview2", "webview", "microsoft edge", "edge runtime"))
@@ -323,6 +408,18 @@ def _message_box(title: str, text: str) -> None:
         print(f"{title}: {text}", file=sys.stderr)
 
 
+def _ask_yes_no(title: str, text: str) -> bool:
+    """A yes/no box, defaulting to NO. False anywhere there is no desktop
+    to ask on, because the answer to "may I change something on your
+    disk?" when nobody can be asked is no."""
+    if sys.platform != "win32":
+        return False
+    # MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2 -- No is the default
+    # button, so a reflexive Enter declines rather than consents.
+    answer = ctypes.windll.user32.MessageBoxW(None, text, title, 0x4 | 0x20 | 0x100)
+    return answer == 6  # IDYES
+
+
 class Api:
     """The JS bridge: every method here is callable as
     `window.pywebview.api.<name>(...)` from `app.js`."""
@@ -529,17 +626,43 @@ def main(argv: list[str] | None = None) -> int:
     bridge = Api([str(Path(p).resolve()) for p in args.paths], args.autorun)
     settings = bridge.load_settings()
 
-    # Said once per folder, before any .NET loader runs, and then the
-    # window is still tried: a notice about a name that has broken the
-    # window before, not a refusal to run from it. Remembered in the
-    # settings file so a folder the window turns out to open from is not
-    # nagged about on every launch.
+    # The download mark stops the .NET loader, so it has to go before the
+    # loader runs -- but removing it is a change to files on the user's
+    # disk, and stripping the mark is also a thing malware does to hide
+    # where it came from. So KlikBack ASKS, once per folder, and does
+    # nothing at all unless the answer is yes (user's call, 2026-08-25).
+    # Declining is remembered so it is asked once and not on every launch;
+    # the window then fails, and its message names the manual fix.
     folder = app_folder()
-    folder_note = folder_name_problem(folder)
-    if folder_note is not None and settings.get("folder_notice") != str(folder):
-        _message_box(PRODUCT, folder_note + "\n\nKlikBack will now try to "
+    if blocked_by_windows(folder) is not None:
+        if settings.get("unblock_declined") == str(folder):
+            pass
+        elif _ask_yes_no(PRODUCT, (
+            "Windows has marked KlikBack's own files as downloaded from "
+            "the internet, and that stops its window from opening. It "
+            "happens when a zip is downloaded with a browser and then "
+            "extracted with Explorer.\n\n"
+            "Clear that mark from KlikBack's own files?\n"
+            f"    {folder}\n\n"
+            "This is the same thing as right-clicking that folder, "
+            "choosing Properties and ticking Unblock. Nothing outside "
+            "the folder is touched, and no file's contents change.\n\n"
+            "If you choose No, the window will not open, but "
+            "klikback-cli.exe still works."
+        )):
+            unblock_own_files(folder)
+        else:
+            settings["unblock_declined"] = str(folder)
+            bridge.save_settings(settings)
+
+    # Whatever would not clear -- a read-only folder, a network share, or
+    # a person who said no -- is still worth naming, because the window is
+    # about to fail.
+    blocked = blocked_by_windows(folder)
+    if blocked is not None and settings.get("blocked_notice") != str(folder):
+        _message_box(PRODUCT, blocked + "\n\nKlikBack will now try to "
                      "open its window anyway.")
-        settings["folder_notice"] = str(folder)
+        settings["blocked_notice"] = str(folder)
         bridge.save_settings(settings)
 
     geometry = restore_geometry(settings.get("window") or {})
